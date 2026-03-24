@@ -63,3 +63,22 @@ pub struct CloudinaryClient {
     config: CloudinaryConfig,
     http: reqwest::Client
 }
+
+impl CloudinaryClient {
+    pub fn new(config: CloudinaryConfig) -> Self {
+        Self {
+            config,
+            http: reqwest::Client::new()
+        }
+    }
+
+    pub async fn upload(
+        &self,
+        file_bytes: Vec<u8>,
+        file_name: &str,
+        content_type: &str,
+        options: UploadOptions
+    ) {
+        
+    }
+}

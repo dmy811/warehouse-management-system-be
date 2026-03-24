@@ -1,0 +1,10 @@
+pub const INVALID_CREDENTIALS: &str = "INVALID_CREDENTIALS";
+pub const INVALID_TOKEN: &str = "INVALID_TOKEN";
+pub const UNAUTHORIZED: &str = "UNAUTHORIZED";
+pub const FORBIDDEN: &str = "FORBIDDEN";
+pub const NOT_FOUND: &str = "NOT_FOUND";
+pub const CONFLICT: &str = "CONFLICT";
+pub const VALIDATION_ERROR: &str = "VALIDATION_ERROR";
+pub const INSUFFICIENT_STOCK: &str = "INSUFFICIENT_STOCK";
+pub const DATABASE_ERROR: &str = "DATABASE_ERROR";
+pub const INTERNAL_SERVER_ERROR: &str = "INTERNAL_SERVER_ERROR";

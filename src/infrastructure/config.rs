@@ -15,19 +15,6 @@ pub enum AppEnv {
     Production
 }
 
-#[derive(Debug, Clone)]
-pub struct CloudinaryConfig {
-    pub cloud_name: String,
-    pub api_key: String,
-    pub api_secret: String
-}
-
-impl CloudinaryConfig {
-    pub fn upload_url(&self) -> String {
-        format!("https://api.cloudinary.com/v1_1/{}/image/upload", self.cloud_name)
-    }
-}
-
 impl Config {
     pub fn from_env() -> Result<Self> {
         Ok(Self {
@@ -43,15 +30,49 @@ impl Config {
                     "production" => AppEnv::Production,
                     _ => AppEnv::Development
                 },
-            cloudinary: CloudinaryConfig {
-                cloud_name: std::env::var("CLOUDINARY_CLOUD_NAME").context("CLOUDINARY_CLOUD_NAME must be set")?,
-                api_key: std::env::var("CLOUDINARY_API_KEY").context("CLOUDINARY_API_KEY must be set")?,
-                api_secret: std::env::var("CLOUDINARY_API_SECRET").context("CLOUDINARY_API_SECRET must be set")?
-            }
+            cloudinary: CloudinaryConfig::from_env()?
         })
     }
 
     pub fn is_production(&self) -> bool {
         self.app_env == AppEnv::Production
+    }
+
+    pub fn dummy() -> Self {
+        Self {
+            database_url: String::new(),
+            jwt_secret: String::new(),
+            jwt_expires_in_secs: 0,
+            app_env: AppEnv::Development,
+            cloudinary: CloudinaryConfig::dummy(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct CloudinaryConfig {
+    pub cloud_name: String,
+    pub api_key: String,
+    pub api_secret: String
+}
+
+impl CloudinaryConfig {
+    pub fn from_env() -> Result<Self> {
+        Ok(Self {
+            cloud_name: std::env::var("CLOUDINARY_CLOUD_NAME").context("CLOUDINARY_CLOUD_NAME must be set")?,
+            api_key: std::env::var("CLOUDINARY_API_KEY").context("CLOUDINARY_API_KEY must be set")?,
+            api_secret: std::env::var("CLOUDINARY_API_SECRET").context("CLOUDINARY_API_SECRET must be set")?
+        })
+    }
+    pub fn upload_url(&self) -> String {
+        format!("https://api.cloudinary.com/v1_1/{}/image/upload", self.cloud_name)
+    }
+
+    pub fn dummy() -> Self {
+        Self {
+            cloud_name: String::new(),
+            api_key: String::new(),
+            api_secret: String::new()
+        }
     }
 }

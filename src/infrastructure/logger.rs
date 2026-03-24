@@ -2,7 +2,7 @@ use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, Env
 
 use crate::infrastructure::config::{AppEnv, Config};
 
-pub fn init(config: &Config) {
+pub fn init_logger(config: &Config) {
     let env_filter = EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| EnvFilter::new("info,sqlx=warn,tower_http=debug"));
 
