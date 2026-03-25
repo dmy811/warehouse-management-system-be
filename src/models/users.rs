@@ -15,12 +15,14 @@ pub struct User {
     pub updated_at: DateTime<Utc>
 }
 
+// --- Roles model ---
 #[derive(Debug, Clone, FromRow, Serialize)]
 pub struct Role {
     pub id: i32,
     pub name: String
 }
 
+// -- Joined result: users + their role name
 #[derive(Debug, Clone, FromRow)]
 pub struct UserWithRole {
     pub id: i32,
