@@ -19,7 +19,8 @@ pub struct User {
 #[derive(Debug, Clone, FromRow, Serialize)]
 pub struct Role {
     pub id: i32,
-    pub name: String
+    pub name: String,
+    pub created_at: DateTime<Utc>,
 }
 
 // -- Joined result: users + their role name

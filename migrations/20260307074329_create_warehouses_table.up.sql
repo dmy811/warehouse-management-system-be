@@ -18,3 +18,8 @@ ON public.warehouses (deleted_at);
 
 CREATE INDEX IF NOT EXISTS idx_warehouses_name
 ON public.warehouses (name);
+
+CREATE TRIGGER trigger_warehouse_updated_at
+BEFORE UPDATE ON public.warehouses
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();

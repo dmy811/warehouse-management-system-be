@@ -74,4 +74,4 @@ impl AuthResponse {
             user: UserResponse::from(user)
         }
     }
-} 
+}
