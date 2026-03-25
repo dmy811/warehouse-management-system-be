@@ -36,13 +36,13 @@ pub struct LoginRequest {
 // --- Response DTOs ---
 #[derive(Debug, Serialize)]
 pub struct UserResponse {
-    pub id: i32,
+    pub id: i64,
     pub name: String,
     pub email: String,
     pub phone: Option<String>,
     pub photo: Option<String>,
     pub role: Option<String>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Option<DateTime<Utc>>,
 }
 
 impl From<UserWithRole> for UserResponse {
