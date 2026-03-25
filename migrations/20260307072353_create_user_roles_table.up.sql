@@ -16,8 +16,12 @@ ADD CONSTRAINT fk_user_roles_role
 FOREIGN KEY (role_id) REFERENCES public.roles (id) ON DELETE CASCADE;
 
 ALTER TABLE public.user_roles
-ADD CONSTRAINT unique_user_roles_user_id UNIQUE (user_id);
+ADD CONSTRAINT unique_user_roles UNIQUE (user_id, role_id);
 
-CREATE INDEX IF NOT EXISTS idx_user_roles_user_id ON public.user_roles (user_id);
 CREATE INDEX IF NOT EXISTS idx_user_roles_role_id ON public.user_roles (role_id);
 CREATE INDEX IF NOT EXISTS idx_user_roles_created_at ON public.user_roles (created_at);
+
+CREATE TRIGGER trigger_user_roles_updated_at
+BEFORE UPDATE ON public.user_roles
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();

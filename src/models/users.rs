@@ -1,13 +1,36 @@
+use chrono::{DateTime, Utc};
 use serde::Serialize;
+use sqlx::FromRow;
 
-#[derive(sqlx::FromRow, Debug, Serialize)]
+#[derive(Debug, Clone, FromRow)]
 pub struct User {
-    pub id: i64,
+    pub id: i32,
     pub name: String,
     pub email: String,
     pub password: String,
     pub photo: Option<String>,
     pub phone: Option<String>,
-    pub created_at: Option<chrono::DateTime<chrono::Utc>>,
-    pub updated_at: Option<chrono::DateTime<chrono::Utc>>
+    pub deleted_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>
+}
+
+#[derive(Debug, Clone, FromRow, Serialize)]
+pub struct Role {
+    pub id: i32,
+    pub name: String
+}
+
+#[derive(Debug, Clone, FromRow)]
+pub struct UserWithRole {
+    pub id: i32,
+    pub name: String,
+    pub email: String,
+    pub password: String,
+    pub photo: Option<String>,
+    pub phone: Option<String>,
+    pub role_name: Option<String>,
+    pub deleted_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>
 }
