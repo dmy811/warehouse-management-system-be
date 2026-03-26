@@ -11,8 +11,8 @@ pub struct User {
     pub photo: Option<String>,
     pub phone: Option<String>,
     pub deleted_at: Option<DateTime<Utc>>,
-    pub created_at: Option<DateTime<Utc>>,
-    pub updated_at: Option<DateTime<Utc>>
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>
 }
 
 // --- Roles model ---
@@ -34,6 +34,6 @@ pub struct UserWithRole {
     pub phone: Option<String>,
     pub role_name: Option<String>, // harus option karena left join
     pub deleted_at: Option<DateTime<Utc>>,
-    pub created_at: Option<DateTime<Utc>>,
-    pub updated_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>
 }

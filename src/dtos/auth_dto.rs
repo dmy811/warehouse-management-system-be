@@ -43,7 +43,7 @@ pub struct UserResponse {
     pub phone: Option<String>,
     pub photo: Option<String>,
     pub role: Option<String>,
-    pub created_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
 }
 
 impl From<UserWithRole> for UserResponse {
