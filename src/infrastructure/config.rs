@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 pub struct Config {
     pub database_url: String,
     pub jwt_secret: String,
-    pub jwt_expires_in_secs: u64,
+    pub jwt_expires_in_secs: i64,
     pub app_env: AppEnv,
     pub cloudinary: CloudinaryConfig
 }

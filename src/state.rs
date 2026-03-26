@@ -30,12 +30,12 @@ impl AppState {
         }
     }
 
-    // pub fn dummy() -> Self {
-    //     Self {
-    //         db: PgPool::connect_lazy("postgres://localhost/dummy").expect("Connect_lazy is infallible"),
-    //         config: Arc::new(Config::dummy()),
-    //         cloudinary: Arc::new(CloudinaryClient::dummy()),
-    //         services: ServiceContainer::dummy()
-    //     }
-    // }
+    pub fn dummy() -> Self {
+        Self {
+            db: PgPool::connect_lazy("postgres://localhost/dummy").expect("Connect_lazy is infallible"),
+            config: Arc::new(Config::dummy()),
+            cloudinary: Arc::new(CloudinaryClient::dummy()),
+            services: ServiceContainer::dummy()
+        }
+    }
 }

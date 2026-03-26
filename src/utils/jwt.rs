@@ -13,7 +13,7 @@ pub struct Claims {
 }
 
 pub fn create_token(
-    user_id: i32,
+    user_id: i64,
     role: &str,
     secret: &str,
     expires_in_secs: i64
@@ -52,7 +52,7 @@ mod tests {
     use super::*;
 
     const TEST_SECRET: &str = "test_secret_key_that-is_long_enough";
-    const TEST_USER_ID: i32 = 42;
+    const TEST_USER_ID: i64 = 42;
     const TEST_ROLE: &str = "ADMIN";
 
     #[test]

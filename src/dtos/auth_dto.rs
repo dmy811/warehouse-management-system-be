@@ -3,7 +3,8 @@ use serde::{Deserialize, Serialize};
 use validator::Validate;
 
 use crate::models::UserWithRole;
-
+use crate::constants::PASSWORD_REGEX;
+use crate::constants::PHONE_REGEX;
 
 // --- Request DTOs ---
 #[derive(Debug, Deserialize, Validate)]
@@ -14,10 +15,10 @@ pub struct RegisterRequest {
     #[validate(email(message = "Invalid email address!"))]
     pub email: String,
 
-    #[validate(length(min = 8, max = 20, message = "Phone must be between 8 and 20 characters!"))]
+    #[validate(length(min = 8, max = 20, message = "Phone must be between 8 and 20 characters!"), regex(path = "*PHONE_REGEX", message = "Invalid phone number format"))]
     pub phone: Option<String>,
     
-    #[validate(length(min = 8, message = "Password must at least 8 and 20 characters!"))]
+    #[validate(length(min = 8, message = "Password must at least 8 and 20 characters!"), regex(path = "*PASSWORD_REGEX", message = "Password must contain uppercase, lowercase, and number"))]
     pub password: String,
 
     #[validate(length(min = 8, message = "Password must at least 8 and 20 characters!"), must_match(other = "password", message = "Password and Confirm Password doesn't match!"))]
