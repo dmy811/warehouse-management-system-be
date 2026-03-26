@@ -1,108 +1,245 @@
-use std::any;
+use async_trait::async_trait;
+use sqlx::PgPool;
 
-use crate::{infrastructure::db::DBPool, models::warehouses::{CreateWarehouseRequest, UpdateWarehouseRequest, Warehouse}};
+use crate::{
+    dtos::ListWarehouseQuery,
+    errors::AppResult,
+    models::{Warehouse, WarehouseWithStats}
+};
 
-pub async fn create_warehouse(
-    pool: &DBPool,
-    payload: &CreateWarehouseRequest
-) -> anyhow::Result<Warehouse> {
-    let created = sqlx::query_as!(
-        Warehouse,
-        r#"
-        INSERT INTO public.warehouses (name, address, photo, phone)
-        VALUES ($1, $2, $3, $4)
-        RETURNING id, name, address, photo, phone, deleted_at, updated_at, created_at
-        "#,
-        payload.name,
-        payload.address,
-        payload.photo,
-        payload.phone
-    )
-    .fetch_one(pool)
-    .await?;
-
-    Ok(created)
+#[async_trait]
+pub trait WarehouseRepositoryTrait: Send + Sync {
+    async fn find_all(&self, query: &ListWarehouseQuery) -> AppResult<(Vec<WarehouseWithStats>, i64)>;
+    async fn find_by_id(&self, id: i64) -> AppResult<Option<Warehouse>>;
+    async fn name_exists(&self, name: &str, exclude_id: Option<i64>) -> AppResult<bool>;
+    async fn create(&self, name: &str, address: &str, phone: Option<&str>, photo: Option<&str>) -> AppResult<Warehouse>;
+    async fn update(&self, id: i64, name: Option<&str>, address: Option<&str>, phone: Option<Option<&str>>, photo: Option<Option<&str>>) -> AppResult<Option<Warehouse>>;
+    async fn soft_delete(&self, id: i64) -> AppResult<bool>;
+    async fn update_photo(&self, id: i64, photo_url: &str) -> AppResult<()>;
+    async fn clear_photo(&self, id: i64) -> AppResult<()>;
 }
 
-pub async fn find_warehouse_by_id(pool: &DBPool, id: i64) -> anyhow::Result<Option<Warehouse>> {
-    let warehouse = sqlx::query_as!(
-        Warehouse,
-        r#"
-        SELECT id, name, address, photo, phone, deleted_at, updated_at, created_at
-        FROM public.warehouses
-        WHERE id = $1
-        "#,
-        id
-    )
-    .fetch_optional(pool)
-    .await?;
-
-    Ok(warehouse)
+pub struct WarehouseRepository {
+    db: PgPool
 }
 
-pub async fn find_all_warehouses(pool: &DBPool, limit: i64, offset: i64) -> anyhow::Result<Vec<Warehouse>> {
-    let warehouses: Vec<Warehouse> = sqlx::query_as!(
-        Warehouse,
-        r#"
-        SELECT id, name, address, photo, phone, deleted_at, updated_at, created_at
-        FROM public.warehouses
-        ORDER BY created_at DESC
-        LIMIT $1 OFFSET $2
-        "#,
-        limit,
-        offset
-    )
-    .fetch_all(pool)
-    .await?;
-
-    Ok(warehouses)
+impl WarehouseRepository {
+    pub fn new(db: PgPool) -> Self {
+        Self {
+            db
+        }
+    }
 }
 
-pub async fn count_warehouse(pool: &DBPool) -> anyhow::Result<i64> {
-    let count = sqlx::query_scalar!(
-        r#"
-        SELECT COUNT(*) FROM public.warehouses
-        WHERE deleted_at IS NULL
-        "#
-    )
-    .fetch_one(pool)
-    .await?;
+#[async_trait]
+impl WarehouseRepositoryTrait for WarehouseRepository {
+    async fn find_all(&self, query: &ListWarehouseQuery) -> AppResult<(Vec<WarehouseWithStats>, i64)> {
+        let search_pattern = query
+            .search
+            .as_ref()
+            .map(|s| format!("%{}%", s.to_lowercase()));
+ 
+        let sort_col = query.sort_column();
+        let sort_dir = query.sort_direction();
+ 
+        let sql = format!(
+            r#"
+            SELECT
+                w.id,
+                w.name,
+                w.address,
+                w.phone,
+                w.photo,
+                w.deleted_at,
+                w.created_at,
+                w.updated_at,
+                COUNT(DISTINCT i.product_id)   AS total_products,
+                COUNT(DISTINCT r.id)           AS total_racks
+            FROM warehouses w
+            LEFT JOIN inventories i ON i.warehouse_id = w.id
+            LEFT JOIN racks r       ON r.warehouse_id = w.id AND r.deleted_at IS NULL
+            WHERE w.deleted_at IS NULL
+              AND ($1::TEXT IS NULL OR (
+                  LOWER(w.name)    LIKE $1
+               OR LOWER(w.address) LIKE $1
+              ))
+            GROUP BY w.id
+            ORDER BY {sort_col} {sort_dir}
+            LIMIT $2
+            OFFSET $3
+            "#
+        );
+ 
+        let items = sqlx::query_as::<_, WarehouseWithStats>(&sql)
+            .bind(&search_pattern)
+            .bind(query.per_page())
+            .bind(query.offset())
+            .fetch_all(&self.db)
+            .await?;
 
-    Ok(count.unwrap_or(0))
-}
+        let count_sql = r#"
+            SELECT COUNT(*)
+            FROM warehouses w
+            WHERE w.deleted_at IS NULL
+              AND ($1::TEXT IS NULL OR (
+                  LOWER(w.name)    LIKE $1
+               OR LOWER(w.address) LIKE $1
+              ))
+        "#;
+ 
+        let total: i64 = sqlx::query_scalar(count_sql)
+            .bind(&search_pattern)
+            .fetch_one(&self.db)
+            .await?;
+ 
+        Ok((items, total))
+    }
 
-pub async fn update_warehouse(pool: &DBPool, id: i64, payload: &UpdateWarehouseRequest) -> anyhow::Result<Option<Warehouse>> {
-    let updated = sqlx::query_as!(
-        Warehouse,
-        r#"
-        UPDATE public.warehouses
-        SET name = $1, address = $2, photo = $3, phone = $4, updated_at = NOW()
-        WHERE id = $5 AND deleted_at IS NULL
-        RETURNING id, name, address, photo, phone, deleted_at, updated_at, created_at
-        "#,
-        payload.name,
-        payload.address,
-        payload.photo,
-        payload.phone,
-        id
-    )
-    .fetch_optional(pool)
-    .await?;
+    async fn find_by_id(&self, id: i64) -> AppResult<Option<Warehouse>> {
+        let warehouse = sqlx::query_as!(
+            Warehouse,
+            r#"
+            SELECT * FROM warehouses
+            WHERE id = $1 AND deleted_at IS NULL
+            "#,
+            id
+        )
+        .fetch_optional(&self.db)
+        .await?;
 
-    Ok(updated)
-}
+        Ok(warehouse)
+    }
 
-pub async fn delete_warehouse(pool: &DBPool, id: i64) -> anyhow::Result<bool> {
-    let result = sqlx::query!(
-        r#"
-        UPDATE public.warehouses
-        SET deleted_at = NOW()
-        WHERE id = $1 AND deleted_at IS NULL
-        "#,
-        id
-    )
-    .execute(pool)
-    .await?;
+    async fn name_exists(&self, name: &str, exclude_id: Option<i64>) -> AppResult<bool> {
+        let exists = sqlx::query_scalar!(
+            r#"
+            SELECT EXISTS(
+                SELECT 1 FROM warehouses
+                WHERE LOWER(name) = LOWER($1)
+                  AND deleted_at IS NULL
+                  AND ($2::BIGINT IS NULL OR id != $2)
+            )
+            "#,
+            name,
+            exclude_id
+        )
+        .fetch_one(&self.db)
+        .await?
+        .unwrap_or(false);
+ 
+        Ok(exists)
+    }
 
-    Ok(result.rows_affected() > 0)
+    async fn create(&self, name: &str, address: &str, phone: Option<&str>, photo: Option<&str>) -> AppResult<Warehouse> {
+        let warehouse = sqlx::query_as!(
+            Warehouse,
+            r#"
+            INSERT INTO warehouses (name, address, photo, phone)
+            VALUES ($1, $2, $3, $4)
+            RETURNING *
+            "#,
+            name,
+            address,
+            phone,
+            photo
+        )
+        .fetch_one(&self.db)
+        .await?;
+ 
+        Ok(warehouse)
+
+    }
+
+    async fn update(
+        &self,
+        id: i64,
+        name: Option<&str>,
+        address: Option<&str>,
+        phone: Option<Option<&str>>,
+        photo: Option<Option<&str>>,
+    ) -> AppResult<Option<Warehouse>> {
+    let phone_val: Option<&str> = phone.flatten();
+        let photo_val: Option<&str> = photo.flatten();
+        let clear_phone = matches!(phone, Some(None));
+        let clear_photo = matches!(photo, Some(None));
+ 
+        let warehouse = sqlx::query_as!(
+            Warehouse,
+            r#"
+            UPDATE warehouses SET
+                name       = COALESCE($2, name),
+                address    = COALESCE($3, address),
+                phone      = CASE
+                               WHEN $6 = TRUE THEN NULL
+                               ELSE COALESCE($4, phone)
+                             END,
+                photo      = CASE
+                               WHEN $7 = TRUE THEN NULL
+                               ELSE COALESCE($5, photo)
+                             END,
+                updated_at = NOW()
+            WHERE id = $1
+              AND deleted_at IS NULL
+            RETURNING *
+            "#,
+            id,
+            name,
+            address,
+            phone_val,
+            photo_val,
+            clear_phone,
+            clear_photo,
+        )
+        .fetch_optional(&self.db)
+        .await?;
+ 
+        Ok(warehouse)
+    }
+
+     async fn soft_delete(&self, id: i64) -> AppResult<bool> {
+        let result = sqlx::query!(
+            r#"
+            UPDATE warehouses
+            SET deleted_at = NOW(), updated_at = NOW()
+            WHERE id = $1 AND deleted_at IS NULL
+            "#,
+            id
+        )
+        .execute(&self.db)
+        .await?;
+ 
+        // rows_affected = 0 means warehouse not found or already deleted
+        Ok(result.rows_affected() > 0)
+    }
+
+    async fn update_photo(&self, id: i64, photo_url: &str) -> AppResult<()> {
+        sqlx::query!(
+            r#"
+            UPDATE warehouses
+            SET photo = $2, updated_at = NOW()
+            WHERE id = $1 AND deleted_at IS NULL
+            "#,
+            id,
+            photo_url
+        )
+        .execute(&self.db)
+        .await?;
+ 
+        Ok(())
+    }
+ 
+    async fn clear_photo(&self, id: i64) -> AppResult<()> {
+        sqlx::query!(
+            r#"
+            UPDATE warehouses
+            SET photo = NULL, updated_at = NOW()
+            WHERE id = $1 AND deleted_at IS NULL
+            "#,
+            id
+        )
+        .execute(&self.db)
+        .await?;
+ 
+        Ok(())
+    }
 }

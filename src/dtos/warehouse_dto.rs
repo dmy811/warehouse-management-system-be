@@ -62,7 +62,7 @@ fn default_sort_by() -> String { "created_at".to_string() }
 fn default_sort_order() -> String { "desc".to_string() }
 
 impl ListWarehouseQuery {
-    pub fn offset(&self) -> i64 {
+    pub fn offset(&self) -> i64 { // atau skip
         (self.page.max(1) - 1) * self.per_page()
     }
 
