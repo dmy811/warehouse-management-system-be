@@ -20,7 +20,7 @@ pub async fn request_id_middleware(
         .map(|s| s.to_owned())
         .unwrap_or_else(|| Uuid::new_v4().to_string());
 
-    req.extensions_mut().insert(RequestId(request_id.clone()));
+    req.extensions_mut().insert(RequestId(request_id.clone())); // bisa diakses di tempate lain dengan req.extensions().get::<RequestId>()
 
     let span = tracing::info_span!("request", request_id = %request_id);
     let _enter = span.enter();

@@ -42,7 +42,10 @@ pub enum AppError {
     Database(#[from] sqlx::Error),
 
     #[error("Internal server error")]
-    Internal(#[from] anyhow::Error)
+    Internal(#[from] anyhow::Error),
+
+    #[error("Service unavailable: {0}")]
+    ServiceUnavailable(String)
 }
 
 impl AppError {
@@ -55,7 +58,8 @@ impl AppError {
             Self::Conflict(_) => StatusCode::CONFLICT,
             Self::Validation(_) => StatusCode::UNPROCESSABLE_ENTITY,
             Self::InsufficientStock { .. } => StatusCode::UNPROCESSABLE_ENTITY,
-            Self::Database(_) | Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR
+            Self::ServiceUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
+            Self::Database(_) | Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 
@@ -70,7 +74,8 @@ impl AppError {
             Self::Validation(_) => code::VALIDATION_ERROR,
             Self::InsufficientStock { .. } => code::INSUFFICIENT_STOCK,
             Self::Database(_) => code::DATABASE_ERROR,
-            Self::Internal(_) => code::INTERNAL_SERVER_ERROR
+            Self::Internal(_) => code::INTERNAL_SERVER_ERROR,
+            Self::ServiceUnavailable(_) => code::SERVICE_UNAVAILABLE
         }
     }
 }
