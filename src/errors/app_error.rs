@@ -8,8 +8,8 @@ use super::error_codes as code;
 #[derive(Debug, Error)]
 pub enum AppError {
     // auth
-    #[error("Invalid credentials")]
-    InvalidCredentials,
+    #[error("Invalid credentials: {0}")]
+    InvalidCredentials(String),
 
     #[error("Token is invalid or expired")]
     InvalidToken,
@@ -51,7 +51,7 @@ pub enum AppError {
 impl AppError {
     fn status_code(&self) -> StatusCode {
         match self {
-            Self::InvalidCredentials | Self::InvalidToken => StatusCode::UNAUTHORIZED,
+            Self::InvalidCredentials(_) | Self::InvalidToken => StatusCode::UNAUTHORIZED,
             Self::Forbidden => StatusCode::FORBIDDEN,
             Self::Unauthorized => StatusCode::UNAUTHORIZED,
             Self::NotFound(_) => StatusCode::NOT_FOUND,
@@ -65,7 +65,7 @@ impl AppError {
 
     fn error_code(&self) -> &'static str {
         match self {
-            Self::InvalidCredentials => code::INVALID_CREDENTIALS,
+            Self::InvalidCredentials(_) => code::INVALID_CREDENTIALS,
             Self::InvalidToken => code::INVALID_TOKEN,
             Self::Forbidden => code::FORBIDDEN,
             Self::Unauthorized => code::UNAUTHORIZED,

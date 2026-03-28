@@ -1,50 +1,21 @@
--- insert user role keeper
-INSERT INTO public.users (name, email, password, phone, created_at, updated_at)
-VALUES
-    (
-        'John Keeper',
-        'keeper@warehouse.com',
-        '$argon2id$v=19$m=65536,t=3,p=1$cmFuZG9tc2FsdA$SOKL051B9Tb+OVguQvildaUKL9Gu1FdS3wqCat/DWwE', -- keeper123
-        '+6283774468582',
-        CURRENT_TIMESTAMP,
-        CURRENT_TIMESTAMP
-    )
-ON CONFLICT (email) DO NOTHING;
+-- insert user role ADMIN
+INSERT INTO public.users (name, email, password)
+SELECT 'El Admin', 'admin@warehouse.com', '$argon2id$v=19$m=19456,t=2,p=1$F5Zcjg4LavVVybXNwMPzxA$DXxQ6zVtQwkAGSx9CyVre4UyT1CMKL2Ron/O5nhKZTw' -- admin123
+WHERE NOT EXISTS(
+    SELECT 1 FROM public.users
+    WHERE LOWER(email) = LOWER('admin@warehouse.com')
+    AND deleted_at IS NULL
+);
 
--- insert user role keeper
-INSERT INTO public.users (name, email, password, phone, created_at, updated_at)
-VALUES
-    (
-        'Jane Manager',
-        'manager@warehouse.com',
-        '$argon2id$v=19$m=65536,t=3,p=1$cmFuZG9tc2FsdA$fNsgl7wIZgDz7juwyhVa6c5fI00ufT5TocI62aFmcX8', -- manager123
-        '+6277336645518',
-        CURRENT_TIMESTAMP,
-        CURRENT_TIMESTAMP
-    )
-ON CONFLICT (email) DO NOTHING;
 
--- insert user_role keeper
-INSERT INTO public.user_roles (user_id, role_id, created_at, updated_at)
+-- insert user_role admin
+INSERT INTO public.user_roles (user_id, role_id)
 SELECT
     u.id,
-    r.id,
-    CURRENT_TIMESTAMP,
-    CURRENT_TIMESTAMP
+    r.id
 FROM public.users u, public.roles r
-WHERE u.email = 'keeper@warehouse.com' AND r.name = 'keeper'
-ON CONFLICT (user_id) DO NOTHING;
-
--- insert user_role manager
-INSERT INTO public.user_roles (user_id, role_id, created_at, updated_at)
-SELECT
-    u.id,
-    r.id,
-    CURRENT_TIMESTAMP,
-    CURRENT_TIMESTAMP
-FROM public.users u, public.roles r
-WHERE u.email = 'manager@warehouse.com' AND r.name = 'manager'
-ON CONFLICT (user_id) DO NOTHING;
+WHERE u.email = 'admin@warehouse.com' AND r.name = 'ADMIN'
+ON CONFLICT (user_id, role_id) DO NOTHING;
 
 -- verify the inserted users and their roles
 SELECT 
@@ -57,5 +28,5 @@ SELECT
 FROM public.users u
 LEFT JOIN public.user_roles ur ON u.id = ur.user_id
 LEFT JOIN public.roles r ON ur.role_id = r.id
-WHERE u.email IN ('keeper@warehouse.com', 'manager@warehouse.com')
+WHERE u.email = 'admin@warehouse.com'
 ORDER BY u.id;

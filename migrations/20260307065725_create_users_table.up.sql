@@ -19,12 +19,13 @@ CREATE TABLE IF NOT EXISTS public.users (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-ALTER TABLE public.users
-ADD CONSTRAINT unique_users_email UNIQUE (email);
+CREATE UNIQUE INDEX idx_users_email_unique_active 
+ON public.users (LOWER(email)) 
+WHERE deleted_at IS NULL;
 
-CREATE INDEX IF NOT EXISTS idx_users_email ON public.users (email);
-
-CREATE INDEX IF NOT EXISTS idx_users_created_at ON public.users (created_at);
+CREATE INDEX IF NOT EXISTS idx_users_created_at
+ON public.users (created_at)
+WHERE deleted_at IS NULL;
 
 CREATE TRIGGER trigger_users_updated_at
 BEFORE UPDATE ON public.users

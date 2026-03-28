@@ -15,12 +15,14 @@ mod handlers;
 
 use infrastructure::config::Config;
 use tracing::info;
+
+use crate::utils::crypto::hash_password;
  
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // Load .env
     dotenvy::dotenv().ok();
- 
+    
     // Init config (panics early if env vars missing)
     let config = Config::from_env()?;
  
