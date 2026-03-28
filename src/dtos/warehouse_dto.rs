@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
-use crate::{constants::PHONE_REGEX, models::{Warehouse, WarehouseWithStats}};
+use crate::{constants::PHONE_REGEX, errors::AppError, models::{Warehouse, WarehouseWithStats}};
 
 #[derive(Debug, Deserialize, Validate)]
 pub struct CreateWarehouseRequest {
@@ -18,24 +18,89 @@ pub struct CreateWarehouseRequest {
     pub photo: Option<String>
 }
 
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Serialize)]
+pub enum UpdateField<T> {
+    NotSet, // tidak update
+    Null, // update ke null
+    Value(T) // update ke value baru
+}
+
+impl<T> UpdateField<T> {
+    pub fn as_ref(&self) -> Option<&T> {
+        match self {
+            UpdateField::Value(v) => Some(v),
+            _ => None
+        }
+    }
+
+    pub fn is_not_set(&self) -> bool{
+        matches!(self, UpdateField::NotSet)
+    }
+
+     pub fn into_parts(self) -> (Option<T>, bool) {
+        match self {
+            // (Value, Clear or not)
+            UpdateField::NotSet => (None, false),
+            UpdateField::Null => (None, true),
+            UpdateField::Value(v) => (Some(v), false),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct UpdateWarehouseRequest {
-    #[validate(length(min = 2, max = 100, message = "Name must be between 2 and 100 characters"))]
+    // #[validate(length(min = 2, max = 100, message = "Name must be between 2 and 100 characters"))]
     pub name: Option<String>,
 
-    #[validate(length(min = 5, max = 500, message = "Address must be between 5 and 500 characters"))]
+    // #[validate(length(min = 5, max = 500, message = "Address must be between 5 and 500 characters"))]
     pub address: Option<String>,
 
-    #[validate(length(min = 8, max = 20, message = "Phone must be between 8 and 20 characters!"), regex(path = "*PHONE_REGEX", message = "Invalid phone number format"))]
-    pub phone: Option<String>,
+    // #[validate(length(min = 8, max = 20, message = "Phone must be between 8 and 20 characters!"), regex(path = "*PHONE_REGEX", message = "Invalid phone number format"))]
+    pub phone: UpdateField<String>,
 
-    pub photo: Option<String>
+    pub photo: UpdateField<String>
 }
 
 impl UpdateWarehouseRequest {
     // returns true if at least one field is provided
     pub fn is_empty(&self) -> bool {
-        self.name.is_none() && self.address.is_none() && self.phone.is_none() && self.photo.is_none()
+        self.name.is_none() && self.address.is_none() && self.phone.is_not_set() && self.photo.is_not_set()
+    }
+
+    pub fn validate(&self) -> Result<(), AppError> {
+        let mut errors: Vec<String> = Vec::new();
+
+        if let Some(name) = &self.name {
+            if name.len() < 2 || name.len() > 100 {
+                errors.push("Name must be between 2 and 100 characters".to_string());
+            }
+        }
+
+        if let Some(address) = &self.address {
+            if address.len() < 5 || address.len() > 500 {
+                errors.push("Address must be between 5 and 500 characters".to_string());
+            }
+        }
+
+        if let Some(phone) = self.phone.as_ref() {
+            if phone.len() < 8 || phone.len() > 20 {
+                errors.push("Phone must be between 8 and 20 characters".to_string());
+            }
+
+            if !PHONE_REGEX.is_match(phone) {
+                errors.push("Invalid phone number format".to_string());
+            }
+        }
+
+        if self.is_empty() {
+            errors.push("At least one field must be provided for update".to_string());
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(AppError::Validation(errors.join(", ")))
+        }
     }
 }
 

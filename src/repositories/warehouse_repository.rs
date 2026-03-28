@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 
 use crate::{
-    dtos::ListWarehouseQuery,
+    dtos::{ListWarehouseQuery, warehouse_dto::UpdateField},
     errors::AppResult,
     models::{Warehouse, WarehouseWithStats}
 };
@@ -13,7 +13,7 @@ pub trait WarehouseRepositoryTrait: Send + Sync {
     async fn find_by_id(&self, id: i64) -> AppResult<Option<Warehouse>>;
     async fn name_exists(&self, name: &str, exclude_id: Option<i64>) -> AppResult<bool>;
     async fn create(&self, name: &str, address: &str, phone: Option<&str>, photo: Option<&str>) -> AppResult<Warehouse>;
-    async fn update(&self, id: i64, name: Option<&str>, address: Option<&str>, phone: Option<Option<&str>>, photo: Option<Option<&str>>) -> AppResult<Option<Warehouse>>;
+    async fn update(&self, id: i64, name: Option<&str>, address: Option<&str>, phone: UpdateField<&str>, photo: UpdateField<&str>) -> AppResult<Option<Warehouse>>;
     async fn soft_delete(&self, id: i64) -> AppResult<bool>;
     async fn update_photo(&self, id: i64, photo_url: &str) -> AppResult<()>;
     async fn clear_photo(&self, id: i64) -> AppResult<()>;
@@ -155,13 +155,15 @@ impl WarehouseRepositoryTrait for WarehouseRepository {
         id: i64,
         name: Option<&str>,
         address: Option<&str>,
-        phone: Option<Option<&str>>,
-        photo: Option<Option<&str>>,
+        phone: UpdateField<&str>,
+        photo: UpdateField<&str>,
     ) -> AppResult<Option<Warehouse>> {
-    let phone_val: Option<&str> = phone.flatten();
-        let photo_val: Option<&str> = photo.flatten();
-        let clear_phone = matches!(phone, Some(None));
-        let clear_photo = matches!(photo, Some(None));
+        // let phone_val: Option<&str> = phone.flatten();
+        // let photo_val: Option<&str> = photo.flatten();
+        // let clear_phone = matches!(phone, Some(None));
+        // let clear_photo = matches!(photo, Some(None));
+        let (phone_val, clear_phone) = phone.into_parts();
+        let (photo_val, clear_photo) = photo.into_parts();
  
         let warehouse = sqlx::query_as!(
             Warehouse,
