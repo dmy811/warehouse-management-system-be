@@ -37,16 +37,6 @@ impl Config {
     pub fn is_production(&self) -> bool {
         self.app_env == AppEnv::Production
     }
-
-    pub fn dummy() -> Self {
-        Self {
-            database_url: String::new(),
-            jwt_secret: String::new(),
-            jwt_expires_in_secs: 0,
-            app_env: AppEnv::Development,
-            cloudinary: CloudinaryConfig::dummy(),
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -66,13 +56,5 @@ impl CloudinaryConfig {
     }
     pub fn upload_url(&self) -> String {
         format!("https://api.cloudinary.com/v1_1/{}/image/upload", self.cloud_name)
-    }
-
-    pub fn dummy() -> Self {
-        Self {
-            cloud_name: String::new(),
-            api_key: String::new(),
-            api_secret: String::new()
-        }
     }
 }

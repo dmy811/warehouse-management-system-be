@@ -1,21 +1,16 @@
-use axum::{Router, middleware, routing::{get, post}};
+use axum::{Router, middleware, routing::{get, post, delete}};
 
-use crate::{handlers::auth_handler, state::AppState, middlewares::auth_middleware};
+use crate::{handlers::{auth_handler, upload_handler}, state::AppState};
 
-pub fn auth_routes() -> Router<AppState> {
-    let public = Router::new()
+pub fn auth_public_routes() -> Router<AppState> {
+    Router::new()
         .route("/auth/register", post(auth_handler::register))
-        .route("/auth/login", post(auth_handler::login));
+        .route("/auth/login", post(auth_handler::login))
+}
 
-// AppState::dummy() satisfies the type system at build time;
-// Axum replaces it with the real state via .with_state() in app.rs.
-
-    let protected = Router::new()
+pub fn auth_protected_routes() -> Router<AppState> {
+    Router::new()
         .route("/auth/me", get(auth_handler::me))
-        .route_layer(middleware::from_fn_with_state(
-            AppState::dummy(),
-            auth_middleware
-        ));
-
-    Router::new().merge(public).merge(protected)
+        .route("/auth/me/photo", post(upload_handler::upload_user_photo))
+        .route("/auth/me/photo", delete(upload_handler::delete_user_photo))
 }

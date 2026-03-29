@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use sqlx::PgPool;
 
-use crate::{infrastructure::config::Config, repositories::{AuthRepository, WarehouseRepository}, services::{AuthService, AuthServiceTrait, DummyAuthService, DummyWarehouseService, WarehouseService, WarehouseServiceTrait}};
+use crate::{infrastructure::config::Config, repositories::{AuthRepository, WarehouseRepository}, services::{AuthService, AuthServiceTrait, WarehouseService, WarehouseServiceTrait}};
 
 #[derive(Clone)]
 pub struct ServiceContainer {
@@ -32,15 +32,6 @@ impl ServiceContainer {
             warehouse: Arc::new(WarehouseService::new(warehouse_repo)),
             // product: Arc::new(ProductService::new(product_repo)),
             // // ...
-        }
-    }
-
-    pub fn dummy() -> Self {
-        Self {
-            auth: Arc::new(DummyAuthService),
-            warehouse: Arc::new(DummyWarehouseService),
-            // product: Arc::new(DummyProductService),
-            // ...
         }
     }
 }

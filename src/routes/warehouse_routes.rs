@@ -1,6 +1,6 @@
-use axum::{Router, middleware, routing::{delete, get, patch, post}};
+use axum::{Router, routing::{delete, get, patch, post}};
 
-use crate::{handlers::warehouse_handler, middlewares::auth_middleware, state::AppState};
+use crate::{handlers::{upload_handler, warehouse_handler}, state::AppState};
 
 pub fn warehouse_routes() -> Router<AppState> {
     Router::new()
@@ -9,8 +9,6 @@ pub fn warehouse_routes() -> Router<AppState> {
         .route("/warehouses/{id}", get(warehouse_handler::get_by_id))
         .route("/warehouses/{id}", patch(warehouse_handler::update))
         .route("/warehouses/{id}", delete(warehouse_handler::delete))
-        .route_layer(middleware::from_fn_with_state(
-            AppState::dummy(),
-            auth_middleware
-        ))
+        .route("/warehouses/{id}/photo", post(upload_handler::upload_warehouse_photo))
+        .route("/warehouses/{id}/photo", delete(upload_handler::delete_warehouse_photo))
 }

@@ -20,7 +20,7 @@ pub async fn auth_middleware(
         .sub
         .parse()
         .map_err(|_| AppError::InvalidToken)?;
-
+    
     req.extensions_mut().insert(AuthUser {
         id: user_id,
         role: claims.role

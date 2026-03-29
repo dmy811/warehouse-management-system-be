@@ -75,10 +75,6 @@ impl CloudinaryClient {
         }
     }
 
-    pub fn dummy() -> Self {
-        Self::new(CloudinaryConfig::dummy())
-    }
-
     pub async fn upload(
         &self,
         file_bytes: Vec<u8>,
@@ -88,7 +84,9 @@ impl CloudinaryClient {
     ) -> Result<CloudinaryUploadResponse, AppError> {
         // --- Validation ---
         if file_bytes.len() > MAX_FILE_SIZE {
-            return Err(AppError::Validation(format!("File size exceeds the maximum allowed size of {}MB",
+            return Err(AppError::Validation(format!(
+                "File size {}MB exceeds the {}MB limit",
+                file_bytes.len() / 1024 / 1024,
                 MAX_FILE_SIZE / 1024 / 1024
             )));
         }
@@ -101,6 +99,7 @@ impl CloudinaryClient {
             ))));
         }
 
+        // sama kayak .split() dengan .last(), kenapa pakai rsplit() dan next() karena jauh lebih cepat kompleksitas waktunya
         let ext = file_name
             .rsplit('.')
             .next()
@@ -128,15 +127,14 @@ impl CloudinaryClient {
             ("timestamp".to_string(), timestamp.clone())
         ];
 
-        if let Some(ref pid) = options.public_id {
+        if let Some(pid) = &options.public_id {
             params.push(("public_id".to_string(), pid.clone()));
         }
 
         if options.optimize {
-            params.push((
-                "eager".to_string(),
-                "c_fill,w_800,h_800,q_auto,f_auto".to_string()
-            ));
+            params.push(
+                ( "eager".to_string(), "c_fill,w_800,h_800,q_auto,f_auto".to_string()) // oficiall from cloudinary for transforming
+            );
         }
 
         params.sort_by(|a, b| a.0.cmp(&b.0));
@@ -147,10 +145,8 @@ impl CloudinaryClient {
             .collect::<Vec<_>>()
             .join("&");
 
-        let signature = Self::sha256_hex(&format!(
-            "{}{}",
-            params_string, self.config.api_secret
-        ));
+        let signature = Self::sha256_hex(&format!("{}{}", params_string, self.config.api_secret));
+        // "eager=...&folder=...&public_id=...SECRET_KEY"
 
         debug!(
             folder = options.folder,

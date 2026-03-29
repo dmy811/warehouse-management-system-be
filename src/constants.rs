@@ -18,6 +18,7 @@ pub mod file_upload {
     pub const MAX_FILE_SIZE: usize = 5 * 1024 * 1024; // 5mb
     pub const ALLOWED_MIME_TYPES: &[&str] = &["image/jpeg", "image/png", "image/webp"];
     pub const ALLOWED_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "webp"];
+    pub const PHOTO_FIELD: &str = "photo";
 }
 
 pub mod stock {

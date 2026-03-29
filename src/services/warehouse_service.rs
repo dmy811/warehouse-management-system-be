@@ -172,30 +172,3 @@ impl<R: WarehouseRepositoryTrait> WarehouseServiceTrait for WarehouseService<R> 
         Ok(())
     }
 }
-
-pub struct DummyWarehouseService;
-
-#[async_trait]
-impl WarehouseServiceTrait for DummyWarehouseService {
-    async fn list(&self, _: ListWarehouseQuery) -> AppResult<PaginatedResponse<WarehouseSummary>> {
-        unreachable!("DummyWarehouseService is never called at runtime")
-    }
-    async fn get_by_id(&self, _: i64) -> AppResult<WarehouseResponse> {
-        unreachable!()
-    }
-    async fn create(&self, _: CreateWarehouseRequest, _: i64) -> AppResult<WarehouseResponse> {
-        unreachable!()
-    }
-    async fn update(&self, _: i64, _: UpdateWarehouseRequest, _: i64) -> AppResult<WarehouseResponse> {
-        unreachable!()
-    }
-    async fn delete(&self, _: i64, _: i64) -> AppResult<()> {
-        unreachable!()
-    }
-    async fn update_photo(&self, _: i64, _: &str, _: i64) -> AppResult<()> {
-        unreachable!()
-    }
-    async fn delete_photo(&self, _: i64, _: i64) -> AppResult<()> {
-        unreachable!()
-    }
-}

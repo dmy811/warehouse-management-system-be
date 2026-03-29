@@ -130,27 +130,6 @@ impl<R: AuthRepositoryTrait> AuthServiceTrait for AuthService<R> {
     }
 }
 
-// Used only at route-build time, never at runtime.
-pub struct DummyAuthService;
-
-#[async_trait]
-impl AuthServiceTrait for DummyAuthService {
-        async fn register(&self, _: RegisterRequest) -> AppResult<AuthResponse> {
-        unreachable!("DummyAuthService is never called at runtime")
-    }
-    async fn login(&self, _: LoginRequest) -> AppResult<AuthResponse> {
-        unreachable!("DummyAuthService is never called at runtime")
-    }
-    async fn me(&self, _: i64) -> AppResult<UserResponse> {
-        unreachable!("DummyAuthService is never called at runtime")
-    }
-    async fn update_photo(&self, _: i64, _: &str) -> AppResult<()> {
-        unreachable!()
-    }
-    async fn delete_photo(&self, _: i64) -> AppResult<()> {
-        unreachable!()
-    }
-}
 
 // #[cfg(test)]
 // mod tests {

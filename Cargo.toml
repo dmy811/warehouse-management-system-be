@@ -50,10 +50,3 @@ regex = "1"
 [dev-dependencies]
 # Mocking for unit tests
 mockall = "0.13"
- 
-# HTTP client for integration tests
-reqwest = { version = "0.12", features = ["json"] }
- 
-# Test utilities
-tokio = { version = "1", features = ["full"] }
-serde_json = "1"
