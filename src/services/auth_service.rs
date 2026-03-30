@@ -71,6 +71,69 @@ impl<R: AuthRepositoryTrait> AuthServiceTrait for AuthService<R> {
         Ok(AuthResponse::new(token, user_with_role))
     }
 
+    // 🧠 1. Prinsip utama tokio::join!
+
+    // 👉 join! hanya bisa dipakai kalau:
+
+    // semua operasi itu independen (tidak saling bergantung)
+
+    // 🔍 2. Analisis kode kamu
+    // ❌ Bagian ini TIDAK bisa di-join
+    // if self.repo.email_exists(&req.email).await? {
+    //     return Err(...);
+    // }
+
+    // Kenapa?
+
+    // ini validasi awal
+    // kalau email sudah ada → stop
+
+    // 👉 tidak bisa diparalelkan dengan yang lain
+
+    // ❌ Ini juga tidak bisa di-join
+    // let user = self.repo.create(...).await?;
+
+    // Kenapa?
+
+    // butuh password_hash dulu
+    // berarti bergantung hasil sebelumnya
+    // ❌ Ini juga tidak bisa di-join
+    // let user_with_role = self.repo.find_by_id(user.id).await?;
+
+    // Kenapa?
+
+    // butuh user.id dari create
+    // lagi-lagi dependent
+    // ⚡ Jadi alurnya:
+    // email_exists
+    // ↓
+    // hash_password
+    // ↓
+    // create_user
+    // ↓
+    // find_by_id
+    // ↓
+    // create_token
+
+    // 👉 Semua ini chain / berurutan (dependent)
+    // 👉 ❗ Tidak bisa di-parallel-kan
+
+    // 🔥 3. Jadi di mana join! bisa dipakai?
+    // ✅ Contoh yang BENAR
+
+    // Misalnya kamu punya:
+
+    // let user = repo.get_user(id);
+    // let orders = repo.get_orders(id);
+
+    // 👉 ini bisa:
+
+    // let (user, orders) = tokio::join!(user, orders);
+
+    // Karena:
+
+    // tidak saling bergantung
+
     async fn login(&self, req: LoginRequest) -> AppResult<AuthResponse>{
         let user = self
             .repo

@@ -12,6 +12,7 @@ mod services;
 mod state;
 mod utils;
 mod handlers;
+mod validators;
 
 use infrastructure::config::Config;
 use tracing::info;

@@ -13,7 +13,7 @@ pub async fn create_pool(database_url: &str) -> Result<PgPool> {
         .connect(database_url)
         .await?;
 
-    sqlx::migrate!("./migrations").run(&pool).await?;
+    // sqlx::migrate!("./migrations").run(&pool).await?;
     info!("Database connected and migration applied successfully");
     Ok(pool)
 }

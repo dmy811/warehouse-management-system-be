@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
-use crate::{constants::PHONE_REGEX, errors::AppError, models::{Warehouse, WarehouseWithStats}};
+use crate::{validators::common::PHONE_ID_REGEX, errors::AppError, models::{Warehouse, WarehouseWithStats}};
 
 #[derive(Debug, Deserialize, Validate)]
 pub struct CreateWarehouseRequest {
@@ -12,7 +12,7 @@ pub struct CreateWarehouseRequest {
     #[validate(length(min = 5, max = 500, message = "Address must be between 5 and 500 characters"))]
     pub address: String,
 
-    #[validate(length(min = 8, max = 20, message = "Phone must be between 8 and 20 characters!"), regex(path = "*PHONE_REGEX", message = "Invalid phone number format"))]
+    #[validate(length(min = 10, max = 15, message = "Phone must be between 10 and 15 digits!"), regex(path = "*PHONE_ID_REGEX", message = "Phone must be a valid Indonesian number (+62xxx or 08xxx)"))]
     pub phone: Option<String>,
 
     pub photo: Option<String>
@@ -55,7 +55,7 @@ pub struct UpdateWarehouseRequest {
     // #[validate(length(min = 5, max = 500, message = "Address must be between 5 and 500 characters"))]
     pub address: Option<String>,
 
-    // #[validate(length(min = 8, max = 20, message = "Phone must be between 8 and 20 characters!"), regex(path = "*PHONE_REGEX", message = "Invalid phone number format"))]
+    // #[validate(length(min = 10, max = 15, message = "Phone must be between 10 and 15 digits!"), regex(path = "*PHONE_ID_REGEX", message = "Phone must be a valid Indonesian number (+62xxx or 08xxx)"))]
     pub phone: UpdateField<String>,
 
     pub photo: UpdateField<String>
@@ -67,6 +67,7 @@ impl UpdateWarehouseRequest {
         self.name.is_none() && self.address.is_none() && self.phone.is_not_set() && self.photo.is_not_set()
     }
 
+    // custom validation
     pub fn validate(&self) -> Result<(), AppError> {
         let mut errors: Vec<String> = Vec::new();
 
@@ -82,13 +83,9 @@ impl UpdateWarehouseRequest {
             }
         }
 
-        if let Some(phone) = self.phone.as_ref() {
-            if phone.len() < 8 || phone.len() > 20 {
-                errors.push("Phone must be between 8 and 20 characters".to_string());
-            }
-
-            if !PHONE_REGEX.is_match(phone) {
-                errors.push("Invalid phone number format".to_string());
+        if let UpdateField::Value(phone) = &self.phone {
+            if !PHONE_ID_REGEX.is_match(phone) {
+                errors.push("Phone must be a valid Indonesian number (+62xxx or 08xxx) and between 10 - 15 digits".to_string());
             }
         }
 

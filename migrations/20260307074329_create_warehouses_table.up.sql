@@ -49,3 +49,24 @@ EXECUTE FUNCTION set_updated_at();
 -- CREATE TRIGGER racks_updated_at
 --     BEFORE UPDATE ON racks
 --     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- CREATE TABLE IF NOT EXISTS products (
+--     id          SERIAL PRIMARY KEY,
+--     name        VARCHAR(100)  NOT NULL,
+--     sku         VARCHAR(50)   NOT NULL,
+--     unit        VARCHAR(20)   NOT NULL,
+--     description TEXT,
+--     min_stock   INT           NOT NULL DEFAULT 0,
+--     category_id INT           NOT NULL REFERENCES categories(id),
+--     deleted_at  TIMESTAMPTZ,
+--     created_at  TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+--     updated_at  TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+--     UNIQUE (sku)
+-- );
+
+-- CREATE UNIQUE INDEX idx_products_sku ON products (sku) WHERE deleted_at IS NULL;
+-- CREATE INDEX idx_products_deleted_at ON products (deleted_at) WHERE deleted_at IS NULL;
+
+-- CREATE TRIGGER products_updated_at
+--     BEFORE UPDATE ON products
+--     FOR EACH ROW EXECUTE FUNCTION update_updated_at();

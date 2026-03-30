@@ -3,8 +3,7 @@ use serde::{Deserialize, Serialize};
 use validator::Validate;
 
 use crate::models::UserWithRole;
-use crate::constants::PASSWORD_REGEX;
-use crate::constants::PHONE_REGEX;
+use crate::validators::common::{validate_indonesian_phone, validate_password_strength};
 
 // --- Request DTOs ---
 #[derive(Debug, Deserialize, Validate)]
@@ -15,13 +14,15 @@ pub struct RegisterRequest {
     #[validate(email(message = "Invalid email address!"))]
     pub email: String,
 
-    #[validate(length(min = 8, max = 20, message = "Phone must be between 8 and 20 characters!"), regex(path = "*PHONE_REGEX", message = "Invalid phone number format"))]
+    // #[validate(length(min = 10, max = 15, message = "Phone must be between 10 and 15 characters!"), regex(path = "*PHONE_REGEX", message = "Invalid phone number format"))]
+    #[validate(custom(function = "validate_indonesian_phone"))]
     pub phone: Option<String>,
     
-    #[validate(length(min = 8, message = "Password must at least 8 and 20 characters!"), regex(path = "*PASSWORD_REGEX", message = "Password must contain uppercase, lowercase, and number"))]
+    // #[validate(length(min = 8, message = "Password must at least 8"), regex(path = "*PASSWORD_REGEX", message = "Password must contain uppercase, lowercase, and number"))]
+    #[validate(custom(function = "validate_password_strength"))]
     pub password: String,
 
-    #[validate(length(min = 8, message = "Password must at least 8 and 20 characters!"), must_match(other = "password", message = "Password and Confirm Password doesn't match!"))]
+    #[validate(length(min = 8, message = "Password must at least 8"), must_match(other = "password", message = "Password and Confirm Password doesn't match!"))]
     pub password_confirm: String
 }
 

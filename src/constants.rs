@@ -29,11 +29,3 @@ pub mod headers {
     pub const REQUEST_ID: &str = "x-request-id";
     pub const REQUEST_ID_RESPONSE: &str = "x-request-id";
 }
-
-pub static PASSWORD_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$").unwrap()
-});
-
-pub static PHONE_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^(\+62|08)[0-9]{8,12}$").unwrap()
-});
