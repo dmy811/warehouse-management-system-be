@@ -138,8 +138,14 @@ impl<R: AuthRepositoryTrait> AuthServiceTrait for AuthService<R> {
         let user = self
             .repo
             .find_by_email(&req.email)
-            .await?
-            .ok_or_else(|| AppError::InvalidCredentials("Email doesn't exists!".to_string()))?;
+            .await?;
+
+        let generic_error = || AppError::InvalidCredentials("Invalid email or password".to_string());
+
+        let user = match user {
+            Some(u) => u,
+            None => return Err(generic_error())
+        };
 
         let password_hash = user.password.clone();
         let password = req.password.clone();
@@ -149,7 +155,7 @@ impl<R: AuthRepositoryTrait> AuthServiceTrait for AuthService<R> {
 
         if !is_valid {
             warn!(email = %req.email, "Failed login attempt - wrong password");
-            return Err(AppError::InvalidCredentials("Password doesn't match!".to_string()));
+            return Err(generic_error());
         }
 
         info!(user_id = user.id, "User logged in");

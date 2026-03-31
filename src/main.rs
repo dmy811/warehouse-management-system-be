@@ -1,23 +1,8 @@
-mod app;
-mod constants;
-mod dtos;
-mod errors;
-mod infrastructure;
-mod middlewares;
-mod models;
-mod repositories;
-mod response;
-mod routes;
-mod services;
-mod state;
-mod utils;
-mod handlers;
-mod validators;
+use warehouse_management_system_backend::infrastructure::config::Config;
+use warehouse_management_system_backend::infrastructure::logger::init_logger;
+use warehouse_management_system_backend::app;
 
-use infrastructure::config::Config;
 use tracing::info;
-
-use crate::utils::crypto::hash_password;
  
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -28,7 +13,7 @@ async fn main() -> anyhow::Result<()> {
     let config = Config::from_env()?;
  
     // Init tracing
-    infrastructure::logger::init_logger(&config);
+    init_logger(&config);
  
     // Build app
     let app = app::build(config).await?;
