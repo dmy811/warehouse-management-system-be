@@ -1,8 +1,8 @@
 -- Add up migration script here
 CREATE TABLE IF NOT EXISTS public.roles (
-    id BIGSERIAL PRIMARY KEY,
-    name VARCHAR(50) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+    id          BIGSERIAL PRIMARY KEY,
+    name        VARCHAR(50)              NOT NULL,
+    created_at  TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 ALTER TABLE public.roles

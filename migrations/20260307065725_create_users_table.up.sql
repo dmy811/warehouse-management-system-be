@@ -8,15 +8,15 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TABLE IF NOT EXISTS public.users (
-    id BIGSERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    email VARCHAR(255) NOT NULL,
-    password VARCHAR(255) NOT NULL,
-    photo TEXT,
-    phone VARCHAR(20),
-    deleted_at TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+    id          BIGSERIAL PRIMARY KEY,
+    name        VARCHAR(100)             NOT NULL,
+    email       VARCHAR(255)             NOT NULL,
+    password    VARCHAR(255)             NOT NULL,
+    photo       TEXT,
+    phone       VARCHAR(15),
+    deleted_at  TIMESTAMP WITH TIME ZONE,
+    created_at  TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE UNIQUE INDEX idx_users_email_unique_active 
