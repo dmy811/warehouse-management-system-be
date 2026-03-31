@@ -47,12 +47,13 @@ impl AuthRepositoryTrait for AuthRepository {
                 u.deleted_at,
                 u.created_at,
                 u.updated_at,
-                r.name as role_name
+                ARRAY_AGG(r.name) FILTER (WHERE r.name IS NOT NULL) as "roles!"
             FROM users u
             LEFT JOIN user_roles ur ON ur.user_id = u.id
             LEFT JOIN roles r ON r.id = ur.role_id
             WHERE u.email = $1
                 AND u.deleted_at IS NULL
+            GROUP BY u.id
             LIMIT 1
             "#,
             email
@@ -77,12 +78,13 @@ impl AuthRepositoryTrait for AuthRepository {
                 u.deleted_at,
                 u.created_at,
                 u.updated_at,
-                r.name as role_name
+                ARRAY_AGG(r.name) FILTER (WHERE r.name IS NOT NULL) as "roles!"
             FROM users u
             LEFT JOIN user_roles ur ON ur.user_id = u.id
             LEFT JOIN roles r ON r.id = ur.role_id
             WHERE u.id = $1
                 AND u.deleted_at IS NULL
+            GROUP BY u.id
             LIMIT 1
             "#,
             id

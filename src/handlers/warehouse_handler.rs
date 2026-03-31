@@ -1,12 +1,12 @@
 use axum::{Extension, Json, extract::{Path, Query, State}, response::IntoResponse};
 use validator::Validate;
 
-use crate::{constants::roles, dtos::{CreateWarehouseRequest, ListWarehouseQuery, UpdateWarehouseRequest, WarehouseResponse, WarehouseSummary}, errors::{AppError, AppResult}, middlewares::{AuthUser, require_roles}, response::{ApiResponse, PaginatedResponse}, state::AppState};
+use crate::{constants::permissions, dtos::{CreateWarehouseRequest, UpdateWarehouseRequest, WarehouseResponse, WarehouseSummary}, errors::{AppError, AppResult}, middlewares::{AuthUser, require_roles}, response::{ApiResponse, PaginatedResponse, ListQuery}, state::AppState};
 
 pub async fn list(
     State(state): State<AppState>,
     Extension(_auth_user): Extension<AuthUser>,
-    Query(query): Query<ListWarehouseQuery>
+    Query(query): Query<ListQuery>
 ) -> AppResult<impl IntoResponse> {
     let result: PaginatedResponse<WarehouseSummary> = state.services.warehouse.list(query).await?;
     Ok(result)
@@ -27,7 +27,7 @@ pub async fn create(
     Extension(auth_user): Extension<AuthUser>,
     Json(req): Json<CreateWarehouseRequest>,
 ) -> AppResult<impl IntoResponse> {
-    require_roles(&[roles::ADMIN, roles::MANAGER])(auth_user.clone())?;
+    require_roles(permissions::CAN_MANAGE_MASTER)(auth_user.clone())?;
 
     req.validate()
         .map_err(|e| AppError::Validation(e.to_string()))?;
@@ -43,7 +43,7 @@ pub async fn update(
     Path(id): Path<i64>,
     Json(req): Json<UpdateWarehouseRequest>,
 ) -> AppResult<impl axum::response::IntoResponse> {
-    require_roles(&[roles::ADMIN, roles::MANAGER])(auth_user.clone())?;
+    require_roles(permissions::CAN_MANAGE_MASTER)(auth_user.clone())?;
  
     req.validate()?;
  
@@ -56,7 +56,7 @@ pub async fn delete(
     Extension(auth_user): Extension<AuthUser>,
     Path(id): Path<i64>,
 ) -> AppResult<impl axum::response::IntoResponse> {
-    require_roles(&[roles::ADMIN])(auth_user.clone())?;
+    require_roles(permissions::CAN_MANAGE_USERS)(auth_user.clone())?;
  
     state.services.warehouse.delete(id, auth_user.id).await?;
     Ok(ApiResponse::no_content())

@@ -3,11 +3,11 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tracing::info;
 
-use crate::{dtos::{CreateWarehouseRequest, ListWarehouseQuery, UpdateWarehouseRequest, WarehouseResponse, WarehouseSummary, warehouse_dto::UpdateField}, errors::{AppError, AppResult}, repositories::WarehouseRepositoryTrait, response::PaginatedResponse};
+use crate::{dtos::{CreateWarehouseRequest, UpdateWarehouseRequest, WarehouseResponse, WarehouseSummary, warehouse_dto::UpdateField}, errors::{AppError, AppResult}, repositories::WarehouseRepositoryTrait, response::{PaginatedResponse, ListQuery}};
 
 #[async_trait]
 pub trait WarehouseServiceTrait: Send + Sync {
-    async fn list(&self, query: ListWarehouseQuery) -> AppResult<PaginatedResponse<WarehouseSummary>>;
+    async fn list(&self, query: ListQuery) -> AppResult<PaginatedResponse<WarehouseSummary>>;
     async fn get_by_id(&self, id: i64) -> AppResult<WarehouseResponse>;
     async fn create(&self, req: CreateWarehouseRequest, actor_id: i64) -> AppResult<WarehouseResponse>;
     async fn update(&self, id: i64, req: UpdateWarehouseRequest, actor_id: i64) -> AppResult<WarehouseResponse>;
@@ -30,7 +30,7 @@ impl<R: WarehouseRepositoryTrait> WarehouseService<R> {
 
 #[async_trait]
 impl<R: WarehouseRepositoryTrait> WarehouseServiceTrait for WarehouseService<R> {
-    async fn list(&self, query: ListWarehouseQuery) -> AppResult<PaginatedResponse<WarehouseSummary>> {
+    async fn list(&self, query: ListQuery) -> AppResult<PaginatedResponse<WarehouseSummary>> {
         let (warehouse, total) = self.repo.find_all(&query).await?;
 
         let items: Vec<WarehouseSummary> = warehouse

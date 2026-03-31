@@ -32,7 +32,7 @@ pub struct UserWithRole {
     pub password: String,
     pub photo: Option<String>,
     pub phone: Option<String>,
-    pub role_name: Option<String>, // harus option karena left join
+    pub roles: Option<Vec<String>>, // harus option karena left join
     pub deleted_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>

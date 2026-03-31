@@ -59,11 +59,11 @@ impl<R: AuthRepositoryTrait> AuthServiceTrait for AuthService<R> {
             .await?
             .ok_or_else(|| AppError::Internal(anyhow::anyhow!("User not found after insert")))?;
 
-        let role = user_with_role.role_name.clone().unwrap_or_default();
+        let roles = user_with_role.roles.clone().unwrap_or_default();
 
         let token = create_token(
             user.id,
-            &role,
+            &roles,
             &self.config.jwt_secret,
             self.config.jwt_expires_in_secs
         )?;
@@ -159,10 +159,10 @@ impl<R: AuthRepositoryTrait> AuthServiceTrait for AuthService<R> {
         }
 
         info!(user_id = user.id, "User logged in");
-        let role = user.role_name.clone().unwrap_or_default();
+        let roles = user.roles.clone().unwrap_or_default();
         let token = create_token(
             user.id,
-            &role,
+            &roles,
             &self.config.jwt_secret,
             self.config.jwt_expires_in_secs
         )?;

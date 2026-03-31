@@ -5,7 +5,7 @@ use crate::{errors::AppError, state::AppState, utils::jwt::verify_token};
 #[derive(Debug, Clone)]
 pub struct AuthUser {
     pub id: i64,
-    pub role: String
+    pub roles: Vec<String>
 }
 
 pub async fn auth_middleware(
@@ -23,7 +23,7 @@ pub async fn auth_middleware(
     
     req.extensions_mut().insert(AuthUser {
         id: user_id,
-        role: claims.role
+        roles: claims.roles
     });
     
     Ok(next.run(req).await)
@@ -46,7 +46,11 @@ pub fn require_roles(
     allowed: &'static [&'static str]
 ) -> impl Fn(AuthUser) -> Result<AuthUser, AppError> + Clone {
     move |user: AuthUser| {
-        if allowed.contains(&user.role.as_str()){
+        let has_role = user.roles.iter().any(|r| {
+            allowed.contains(&r.as_str())
+        });
+        
+        if has_role{
             Ok(user)
         } else {
             Err(AppError::Forbidden)

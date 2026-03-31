@@ -43,7 +43,7 @@ pub struct UserResponse {
     pub email: String,
     pub phone: Option<String>,
     pub photo: Option<String>,
-    pub role: Option<String>,
+    pub roles: Vec<String>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -55,7 +55,7 @@ impl From<UserWithRole> for UserResponse {
             email: u.email,
             phone: u.phone,
             photo: u.photo,
-            role: u.role_name,
+            roles: u.roles.unwrap_or_default(),
             created_at: u.created_at
         }
     }

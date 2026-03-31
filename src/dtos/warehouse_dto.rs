@@ -101,53 +101,6 @@ impl UpdateWarehouseRequest {
     }
 }
 
-#[derive(Debug, Deserialize)]
-pub struct ListWarehouseQuery {
-    #[serde(default = "default_page")] // page number
-    pub page: i64,
-
-    #[serde(default = "default_per_page")] // items per page 
-    pub per_page: i64,
-
-    pub search: Option<String>, // search by name or address (case-insensitive, partial match)
-
-    #[serde(default = "default_sort_by")] // sort field: name | created_at | updated_at
-    pub sort_by: String,
-
-    #[serde(default = "default_sort_order")] // sort direction: asc | desc
-    pub sort_order: String,
-}
-
-fn default_page() -> i64 { 1 }
-fn default_per_page() -> i64 { 20 }
-fn default_sort_by() -> String { "created_at".to_string() }
-fn default_sort_order() -> String { "desc".to_string() }
-
-impl ListWarehouseQuery {
-    pub fn offset(&self) -> i64 { // atau skip
-        (self.page.max(1) - 1) * self.per_page()
-    }
-
-    pub fn per_page(&self) -> i64 {
-        self.per_page.clamp(1, 100)
-    }
-
-    pub fn sort_column(&self) -> &str {
-        match self.sort_by.as_str() {
-            "name" => "w.name",
-            "updated_at" => "w.updated_at",
-            _ => "w.created_at" // default
-        }
-    }
-
-    pub fn sort_direction(&self) -> &str {
-        match self.sort_order.to_lowercase().as_str() {
-            "asc" => "ASC",
-            _ => "DESC", // default
-        }
-    }
-}
-
 #[derive(Debug, Serialize)]
 pub struct WarehouseResponse {
     pub id: i64,

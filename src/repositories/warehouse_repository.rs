@@ -2,14 +2,15 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 
 use crate::{
-    dtos::{ListWarehouseQuery, warehouse_dto::UpdateField},
+    dtos::{warehouse_dto::UpdateField},
     errors::AppResult,
-    models::{Warehouse, WarehouseWithStats}
+    models::{Warehouse, WarehouseWithStats},
+    response::ListQuery
 };
 
 #[async_trait]
 pub trait WarehouseRepositoryTrait: Send + Sync {
-    async fn find_all(&self, query: &ListWarehouseQuery) -> AppResult<(Vec<WarehouseWithStats>, i64)>;
+    async fn find_all(&self, query: &ListQuery) -> AppResult<(Vec<WarehouseWithStats>, i64)>;
     async fn find_by_id(&self, id: i64) -> AppResult<Option<Warehouse>>;
     async fn name_exists(&self, name: &str, exclude_id: Option<i64>) -> AppResult<bool>;
     async fn create(&self, name: &str, address: &str, phone: Option<&str>, photo: Option<&str>) -> AppResult<Warehouse>;
@@ -33,7 +34,7 @@ impl WarehouseRepository {
 
 #[async_trait]
 impl WarehouseRepositoryTrait for WarehouseRepository {
-    async fn find_all(&self, query: &ListWarehouseQuery) -> AppResult<(Vec<WarehouseWithStats>, i64)> {
+    async fn find_all(&self, query: &ListQuery) -> AppResult<(Vec<WarehouseWithStats>, i64)> {
         let search_pattern = query
             .search
             .as_ref()
