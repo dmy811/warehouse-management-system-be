@@ -32,7 +32,7 @@ echo ""
 echo "Menjalankan Seeders..."
 
 run_sql_file "seeders/001_insert_default_roles.sql" "Insert default roles"
-run_sql_file "seeders/002_insert_sample_users.sql" "Insert default users"
+run_sql_file "seeders/002_insert_users_admin.sql" "Insert users admin"
 
 echo "Reset seeders berhasil diterapkan di database!"
 echo ""
