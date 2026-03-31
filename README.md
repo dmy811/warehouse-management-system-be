@@ -109,7 +109,7 @@ pub mod permissions {
     pub const CAN_MANAGE_MASTER: &[&str]       = &[ADMIN, MANAGER];
     pub const CAN_MANAGE_USERS: &[&str]        = &[ADMIN];
     pub const CAN_CREATE_TRANSACTION: &[&str]  = &[ADMIN, MANAGER, STAFF];
-    pub const ALL_AUTHENTICATED: &[&str]       = &[ADMIN, MANAGER, STAFF, VIEWER];
+    pub const ALL_ROLES: &[&str] = &[ADMIN, MANAGER, STAFF, VIEWER];
 }
 ```
 

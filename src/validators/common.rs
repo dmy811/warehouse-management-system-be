@@ -1,6 +1,8 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
 
+use crate::constants::permissions;
+
 // Indonesian phone number: +62xxx or 08xxx, 10 - 15 digits total
 pub static PHONE_ID_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^(\+62|08)[0-9]{8,12}$").expect("valid regex")
@@ -34,6 +36,18 @@ pub fn validate_sku(sku: &str) -> Result<(), validator::ValidationError> {
             "SKU must contain only uppercase letters, digits, and hyphens (e.g. WMS-PROD-001)".into(),
         );
         Err(err)
+    }
+}
+
+pub fn validate_role(role: &str) -> Result<(), validator::ValidationError> {
+    if !permissions::ALL_ROLES.contains(&role) {
+        let mut err = validator::ValidationError::new("role_invalid");
+        err.message = Some(
+            "Role invalid".into(),
+        );
+        Err(err)
+    } else {
+        Ok(())
     }
 }
  

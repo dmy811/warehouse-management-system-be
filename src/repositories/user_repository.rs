@@ -4,6 +4,7 @@ use sqlx::PgPool;
 use crate::{errors::{AppError, AppResult}, models::{User, UserWithRole}, response::ListQuery};
 #[async_trait]
 pub trait UserRepositoryTrait: Send + Sync {
+    async fn email_exists(&self, email: &str) -> AppResult<bool>;
     async fn create(&self, name: &str, email: &str, password_hash: &str, phone: Option<&str>, role: &str) -> AppResult<User>;
     async fn find_all(&self, query: &ListQuery) -> AppResult<(Vec<UserWithRole>, i64)>;
     async fn find_by_id(&self, id: i64) -> AppResult<Option<UserWithRole>>;
@@ -27,6 +28,20 @@ impl UserRepository {
 
 #[async_trait]
 impl UserRepositoryTrait for UserRepository {
+    async fn email_exists(&self, email: &str) -> AppResult<bool>{
+        let exists = sqlx::query_scalar!(
+            r#"SELECT EXISTS(SELECT 1 FROM users WHERE email = 
+            $1 AND deleted_at IS NULL)"#,
+            email
+        )
+        .fetch_one(&self.db)
+        .await?
+        .unwrap_or(false);
+
+        Ok(exists)
+    }
+
+
     async fn create(
         &self,
         name: &str,
