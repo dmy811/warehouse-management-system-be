@@ -4,7 +4,6 @@ use crate::{handlers::{auth_handler, upload_handler}, state::AppState};
 
 pub fn auth_public_routes() -> Router<AppState> {
     Router::new()
-        .route("/auth/register", post(auth_handler::register))
         .route("/auth/login", post(auth_handler::login))
 }
 

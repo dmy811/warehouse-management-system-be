@@ -1,19 +1,7 @@
 use axum::{Extension, Json, extract::State, response::IntoResponse};
 use validator::Validate;
 
-use crate::{dtos::{AuthResponse, LoginRequest, RegisterRequest, UserResponse}, errors::{AppError, AppResult}, middlewares::AuthUser, response::ApiResponse, state::AppState};
-
-pub async fn register(
-    State(state): State<AppState>,
-    Json(req): Json<RegisterRequest>
-) -> AppResult<impl IntoResponse> {
-    req.validate()
-        .map_err(|e| AppError::Validation(e.to_string()))?;
-
-    let result: AuthResponse = state.services.auth.register(req).await?;
-
-    Ok(ApiResponse::created("Registration successful", result))
-}
+use crate::{dtos::{AuthResponse, LoginRequest, UserResponse}, errors::{AppError, AppResult}, middlewares::AuthUser, response::ApiResponse, state::AppState};
 
 pub async fn login(
     State(state): State<AppState>,

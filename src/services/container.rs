@@ -2,12 +2,13 @@ use std::sync::Arc;
 
 use sqlx::PgPool;
 
-use crate::{infrastructure::config::Config, repositories::{AuthRepository, WarehouseRepository}, services::{AuthService, AuthServiceTrait, WarehouseService, WarehouseServiceTrait}};
+use crate::{infrastructure::config::Config, repositories::{AuthRepository, WarehouseRepository, user_repository::UserRepository}, services::{AuthService, AuthServiceTrait, WarehouseService, WarehouseServiceTrait, user_service::{UserService, UserServiceTrait}}};
 
 #[derive(Clone)]
 pub struct ServiceContainer {
     pub auth: Arc<dyn AuthServiceTrait>,
     pub warehouse: Arc<dyn WarehouseServiceTrait>,
+    pub user: Arc<dyn UserServiceTrait>
     // pub product: Arc<dyn ProductServiceTrait>,
     // pub category: Arc<dyn CategoryServiceTrait>,
     // pub supplier: Arc<dyn SupplierServiceTrait>,
@@ -24,12 +25,14 @@ impl ServiceContainer {
     pub fn new(db: &PgPool, config: &Arc<Config>) -> Self {
         let auth_repo = Arc::new(AuthRepository::new(db.clone()));
         let warehouse_repo = Arc::new(WarehouseRepository::new(db.clone()));
+        let user_repo = Arc::new(UserRepository::new(db.clone()));
         // let product_repo = Arc::new(ProductRepository::new(db.clone()));
         // ...
 
         Self {
             auth: Arc::new(AuthService::new(auth_repo, config.clone())),
             warehouse: Arc::new(WarehouseService::new(warehouse_repo)),
+            user: Arc::new(UserService::new(user_repo))
             // product: Arc::new(ProductService::new(product_repo)),
             // // ...
         }

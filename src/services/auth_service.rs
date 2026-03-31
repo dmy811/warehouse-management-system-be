@@ -1,14 +1,12 @@
 use std::sync::Arc;
 
-use argon2::password_hash;
 use async_trait::async_trait;
 use tracing::{info, warn};
 
-use crate::{dtos::{AuthResponse, LoginRequest, RegisterRequest, UserResponse}, errors::{AppError, AppResult}, infrastructure::config::Config, repositories::AuthRepositoryTrait, utils::{crypto::{hash_password, verify_password}, jwt::create_token}};
+use crate::{dtos::{AuthResponse, LoginRequest, UserResponse}, errors::{AppError, AppResult}, infrastructure::config::Config, repositories::AuthRepositoryTrait, utils::{crypto::{hash_password, verify_password}, jwt::create_token}};
 
 #[async_trait]
 pub trait AuthServiceTrait: Send + Sync {
-    async fn register(&self, req: RegisterRequest) -> AppResult<AuthResponse>;
     async fn login(&self, req: LoginRequest) -> AppResult<AuthResponse>;
     async fn me(&self, user_id: i64) -> AppResult<UserResponse>;
     async fn update_photo(&self, user_id: i64, photo_url: &str) -> AppResult<()>;
@@ -31,109 +29,6 @@ impl<R: AuthRepositoryTrait> AuthService<R> {
 
 #[async_trait]
 impl<R: AuthRepositoryTrait> AuthServiceTrait for AuthService<R> {
-    async fn register(&self, req: RegisterRequest) -> AppResult<AuthResponse>{
-        if self.repo.email_exists(&req.email).await? {
-            return Err(AppError::Conflict(format!(
-                "Email '{}' is already registered",
-                req.email
-            )))
-        }
-
-        let password_hash = tokio::task::spawn_blocking({
-            let password = req.password.clone();
-            move || hash_password(&password)
-        })
-        .await
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Thread join error: {}", e)))??;
-
-        let user = self
-            .repo
-            .create(&req.name, &req.email, &password_hash, req.phone.as_deref())
-            .await?;
-
-        info!(user_id = user.id, email = %req.email, "New user registered");
-
-        let user_with_role = self
-            .repo
-            .find_by_id(user.id)
-            .await?
-            .ok_or_else(|| AppError::Internal(anyhow::anyhow!("User not found after insert")))?;
-
-        let roles = user_with_role.roles.clone().unwrap_or_default();
-
-        let token = create_token(
-            user.id,
-            &roles,
-            &self.config.jwt_secret,
-            self.config.jwt_expires_in_secs
-        )?;
-
-        Ok(AuthResponse::new(token, user_with_role))
-    }
-
-    // 🧠 1. Prinsip utama tokio::join!
-
-    // 👉 join! hanya bisa dipakai kalau:
-
-    // semua operasi itu independen (tidak saling bergantung)
-
-    // 🔍 2. Analisis kode kamu
-    // ❌ Bagian ini TIDAK bisa di-join
-    // if self.repo.email_exists(&req.email).await? {
-    //     return Err(...);
-    // }
-
-    // Kenapa?
-
-    // ini validasi awal
-    // kalau email sudah ada → stop
-
-    // 👉 tidak bisa diparalelkan dengan yang lain
-
-    // ❌ Ini juga tidak bisa di-join
-    // let user = self.repo.create(...).await?;
-
-    // Kenapa?
-
-    // butuh password_hash dulu
-    // berarti bergantung hasil sebelumnya
-    // ❌ Ini juga tidak bisa di-join
-    // let user_with_role = self.repo.find_by_id(user.id).await?;
-
-    // Kenapa?
-
-    // butuh user.id dari create
-    // lagi-lagi dependent
-    // ⚡ Jadi alurnya:
-    // email_exists
-    // ↓
-    // hash_password
-    // ↓
-    // create_user
-    // ↓
-    // find_by_id
-    // ↓
-    // create_token
-
-    // 👉 Semua ini chain / berurutan (dependent)
-    // 👉 ❗ Tidak bisa di-parallel-kan
-
-    // 🔥 3. Jadi di mana join! bisa dipakai?
-    // ✅ Contoh yang BENAR
-
-    // Misalnya kamu punya:
-
-    // let user = repo.get_user(id);
-    // let orders = repo.get_orders(id);
-
-    // 👉 ini bisa:
-
-    // let (user, orders) = tokio::join!(user, orders);
-
-    // Karena:
-
-    // tidak saling bergantung
-
     async fn login(&self, req: LoginRequest) -> AppResult<AuthResponse>{
         let user = self
             .repo
