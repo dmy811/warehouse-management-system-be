@@ -6,7 +6,12 @@ use crate::{errors::{AppError, AppResult}, models::{User, UserWithRole}, respons
 pub trait UserRepositoryTrait: Send + Sync {
     async fn create(&self, name: &str, email: &str, password_hash: &str, phone: Option<&str>, role: &str) -> AppResult<User>;
     async fn find_all(&self, query: &ListQuery) -> AppResult<(Vec<UserWithRole>, i64)>;
+    async fn find_by_id(&self, id: i64) -> AppResult<Option<UserWithRole>>;
+    async fn update(&self, id: i64, name: Option<&str>, email: Option<&str>, phone: Option<&str>) -> AppResult<Option<User>>;
+    async fn soft_delete(&self, id: i64) -> AppResult<bool>;
+    async fn hard_delete(&self, id: i64) -> AppResult<bool>;
 }
+
 
 pub struct UserRepository {
     db: PgPool
@@ -99,7 +104,7 @@ impl UserRepositoryTrait for UserRepository {
                 u.deleted_at,
                 u.created_at,
                 u.updated_at,
-                r.name as role_name
+                ARRAY_AGG(r.name) FILTER (WHERE r.name IS NOT NULL) as "roles!"
             FROM users u
             LEFT JOIN user_roles ur ON ur.user_id = u.id
             LEFT JOIN roles r ON r.id = ur.role_id
@@ -108,6 +113,7 @@ impl UserRepositoryTrait for UserRepository {
                     LOWER(u.name) LIKE $1
                 OR  LOWER(u.email) LIKE $1
                 ))
+            GROUP_BY u.id
             ORDER BY {sort_col} {sort_dir}
             LIMIT $2
             OFFSET $3
@@ -137,5 +143,87 @@ impl UserRepositoryTrait for UserRepository {
             .await?;
  
         Ok((items, total))
+    }
+
+    async fn find_by_id(&self, id: i64) -> AppResult<Option<UserWithRole>> {
+        let user = sqlx::query_as!(
+            UserWithRole,
+            r#"
+            SELECT
+                u.id,
+                u.name,
+                u.email,
+                u.password,
+                u.photo,
+                u.phone,
+                u.deleted_at,
+                u.created_at,
+                u.updated_at,
+                ARRAY_AGG(r.name) FILTER (WHERE r.name IS NOT NULL) as "roles!"
+            FROM users u
+            LEFT JOIN user_roles ur ON ur.user_id = u.id
+            LEFT JOIN roles r ON r.id = ur.role_id
+            WHERE u.id = $1
+                AND u.deleted_at IS NULL
+            GROUP BY u.id
+            LIMIT 1
+            "#,
+            id
+        )
+        .fetch_optional(&self.db)
+        .await?;
+
+    Ok(user)
+    }
+
+    async fn update(&self, id: i64, name: Option<&str>, email: Option<&str>, phone: Option<&str>) -> AppResult<Option<User>> {
+        let user = sqlx::query_as!(
+            User,
+            r#"
+            UPDATE users SET
+            name = COALESCE($2, name),
+            email = COALESCE($3, email),
+            phone = COALESCE($4, phone)
+            WHERE id = $1
+            AND deleted_at IS NULL
+            RETURNING *
+            "#,
+            id,
+            name,
+            email,
+            phone
+        )
+        .fetch_optional(&self.db)
+        .await?;
+
+        Ok(user)
+    }
+
+    async fn soft_delete(&self, id: i64) -> AppResult<bool> {
+        let result = sqlx::query!(
+            r#"
+            UPDATE users
+            SET deleted_at = NOW()
+            WHERE id = $1 AND deleted_at IS NULL
+            "#,
+            id
+        )
+        .execute(&self.db)
+        .await?;
+
+        Ok(result.rows_affected() > 0)
+    }
+
+    async fn hard_delete(&self, id: i64) -> AppResult<bool> {
+        let result = sqlx::query!(
+            r#"
+            DELETE FROM users WHERE id = $1
+            "#,
+            id
+        )
+        .execute(&self.db)
+        .await?;
+
+        Ok(result.rows_affected() > 0)
     }
 }
