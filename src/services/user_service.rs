@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use tracing::info;
 
 use crate::{dtos::{UserResponse, user_dto::CreateUserRequest}, errors::{AppError, AppResult}, repositories::user_repository::UserRepositoryTrait, utils::crypto::hash_password};
 
@@ -40,6 +41,17 @@ impl<R: UserRepositoryTrait> UserServiceTrait for UserService<R>  {
 
         let user = self
             .repo
-            .create(&req.name, &req.email, &password_hash, req.phone.as_deref(), role)
+            .create(&req.name, &req.email, &password_hash, req.phone.as_deref(), &req.role)
+            .await?;
+
+        let user_with_role = self
+            .repo
+            .find_by_id(user.id)
+            .await?
+            .ok_or_else(|| AppError::Internal(anyhow::anyhow!("User not found after insert")))?;
+
+        info!(user_id = user.id, email = %req.email, "New user created");
+        
+        Ok(UserResponse::from(user_with_role))
     }
 }
