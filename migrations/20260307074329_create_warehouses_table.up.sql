@@ -11,9 +11,9 @@ CREATE TABLE IF NOT EXISTS public.warehouses (
 );
 
 -- Prevents duplicate names like "Gudang A" and "gudang a"
-ALTER TABLE public.warehouses
-ADD CONSTRAINT unique_warehouses_name
-UNIQUE (LOWER(name)) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS unique_warehouses_name_active
+ON public.warehouses (LOWER(name)) 
+WHERE deleted_at IS NULL;
 
 CREATE INDEX IF NOT EXISTS idx_warehouses_deleted_at
 ON public.warehouses (deleted_at)

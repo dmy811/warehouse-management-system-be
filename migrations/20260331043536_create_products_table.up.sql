@@ -13,9 +13,9 @@ CREATE TABLE IF NOT EXISTS public.products (
     updated_at  TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
 
-ALTER TABLE public.products
-ADD CONSTRAINT unique_products_sku
-UNIQUE (sku) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS unique_products_sku_active
+ON public.products (sku) 
+WHERE deleted_at IS NULL;
 
 CREATE INDEX idx_products_deleted_at ON public.products (deleted_at) WHERE deleted_at IS NULL;
 
