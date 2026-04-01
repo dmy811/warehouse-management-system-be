@@ -11,14 +11,14 @@ use crate::{errors::AppResult, models::{User, UserWithRole}};
 // -- aman untuk async (Send + Sync)
 #[async_trait]
 pub trait AuthRepositoryTrait: Send + Sync {
-    async fn find_by_email(&self, email: &str) -> AppResult<Option<UserWithRole>>;
-    async fn find_by_id(&self, user_id: i64) -> AppResult<Option<UserWithRole>>;
-    async fn email_exists(&self, email: &str) -> AppResult<bool>;
-    async fn create(&self, name: &str, email: &str, password_hash: &str, phone: Option<&str>) -> AppResult<User>;
-    async fn update(&self, id: i64, name: Option<&str>, email: Option<&str>, phone: Option<&str>) -> AppResult<Option<User>>;
-    async fn update_photo(&self, user_id: i64, photo_url: &str) -> AppResult<()>;
-    async fn clear_photo(&self, user_id: i64) -> AppResult<()>;
-    async fn update_password(&self, user_id:i64, password: &str) -> AppResult<()>;
+    async fn find_user_by_email(&self, email: &str) -> AppResult<Option<UserWithRole>>;
+    async fn find_user_by_id(&self, user_id: i64) -> AppResult<Option<UserWithRole>>;
+    async fn check_email_exists(&self, email: &str) -> AppResult<bool>;
+    async fn create_user(&self, name: &str, email: &str, password_hash: &str, phone: Option<&str>) -> AppResult<User>;
+    async fn update_user(&self, id: i64, name: Option<&str>, email: Option<&str>, phone: Option<&str>) -> AppResult<Option<User>>;
+    async fn update_user_photo(&self, user_id: i64, photo_url: &str) -> AppResult<()>;
+    async fn clear_user_photo(&self, user_id: i64) -> AppResult<()>;
+    async fn update_user_password(&self, user_id:i64, password: &str) -> AppResult<()>;
 }
 
 pub struct AuthRepository {
@@ -35,7 +35,7 @@ impl AuthRepository {
 
 #[async_trait]
 impl AuthRepositoryTrait for AuthRepository {
-    async fn find_by_email(&self, email: &str) -> AppResult<Option<UserWithRole>> {
+    async fn find_user_by_email(&self, email: &str) -> AppResult<Option<UserWithRole>> {
         let user = sqlx::query_as!(
             UserWithRole,
             r#"
@@ -66,7 +66,7 @@ impl AuthRepositoryTrait for AuthRepository {
         Ok(user)
     }
 
-    async fn find_by_id(&self, user_id: i64) -> AppResult<Option<UserWithRole>>{
+    async fn find_user_by_id(&self, user_id: i64) -> AppResult<Option<UserWithRole>>{
         let user = sqlx::query_as!(
             UserWithRole,
             r#"
@@ -97,7 +97,7 @@ impl AuthRepositoryTrait for AuthRepository {
         Ok(user)
     }
 
-    async fn email_exists(&self, email: &str) -> AppResult<bool>{
+    async fn check_email_exists(&self, email: &str) -> AppResult<bool>{
         let exists = sqlx::query_scalar!(
             r#"SELECT EXISTS(SELECT 1 FROM users WHERE email = 
             $1 AND deleted_at IS NULL)"#,
@@ -110,7 +110,7 @@ impl AuthRepositoryTrait for AuthRepository {
         Ok(exists)
     }
 
-    async fn create(
+    async fn create_user(
         &self,
         name: &str,
         email: &str,
@@ -136,7 +136,7 @@ impl AuthRepositoryTrait for AuthRepository {
     }
 
 
-    async fn update(&self, id: i64, name: Option<&str>, email: Option<&str>, phone: Option<&str>) -> AppResult<Option<User>> {
+    async fn update_user(&self, id: i64, name: Option<&str>, email: Option<&str>, phone: Option<&str>) -> AppResult<Option<User>> {
         let user = sqlx::query_as!(
             User,
             r#"
@@ -159,7 +159,7 @@ impl AuthRepositoryTrait for AuthRepository {
         Ok(user)
     }
 
-    async fn update_photo(&self, user_id: i64, photo_url: &str) -> AppResult<()>{
+    async fn update_user_photo(&self, user_id: i64, photo_url: &str) -> AppResult<()>{
         sqlx::query!(
             r#"
             UPDATE users SET photo = $2
@@ -174,7 +174,7 @@ impl AuthRepositoryTrait for AuthRepository {
         Ok(())
     }
 
-    async fn clear_photo(&self, user_id: i64) -> AppResult<()>{
+    async fn clear_user_photo(&self, user_id: i64) -> AppResult<()>{
         sqlx::query!(
             r#"
             UPDATE users SET photo = NULL
@@ -188,7 +188,7 @@ impl AuthRepositoryTrait for AuthRepository {
         Ok(())
     }
 
-    async fn update_password(&self, user_id: i64, password: &str) -> AppResult<()> {
+    async fn update_user_password(&self, user_id: i64, password: &str) -> AppResult<()> {
         sqlx::query!(
             r#"
             UPDATE users SET password = $2

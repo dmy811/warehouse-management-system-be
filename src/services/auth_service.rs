@@ -8,11 +8,11 @@ use crate::{dtos::{AuthResponse, LoginRequest, UserResponse, auth_dto::UpdatePas
 #[async_trait]
 pub trait AuthServiceTrait: Send + Sync {
     async fn login(&self, req: LoginRequest) -> AppResult<AuthResponse>;
-    async fn me(&self, user_id: i64) -> AppResult<UserResponse>;
-    async fn update(&self, id: i64, req: UpdateUserRequest) -> AppResult<UserResponse>;
-    async fn update_photo(&self, user_id: i64, photo_url: &str) -> AppResult<()>;
-    async fn delete_photo(&self, user_id: i64) -> AppResult<()>;
-    async fn update_password(&self, user_id: i64, req: UpdatePasswordRequest) -> AppResult<()>;
+    async fn get_profile(&self, user_id: i64) -> AppResult<UserResponse>;
+    async fn update_profile(&self, id: i64, req: UpdateUserRequest) -> AppResult<UserResponse>;
+    async fn update_profile_photo(&self, user_id: i64, photo_url: &str) -> AppResult<()>;
+    async fn delete_profile_photo(&self, user_id: i64) -> AppResult<()>;
+    async fn update_profile_password(&self, user_id: i64, req: UpdatePasswordRequest) -> AppResult<()>;
 }
 
 pub struct AuthService<R: AuthRepositoryTrait> {
@@ -34,7 +34,7 @@ impl<R: AuthRepositoryTrait> AuthServiceTrait for AuthService<R> {
     async fn login(&self, req: LoginRequest) -> AppResult<AuthResponse>{
         let user = self
             .repo
-            .find_by_email(&req.email)
+            .find_user_by_email(&req.email)
             .await?;
 
         let generic_error = || AppError::InvalidCredentials("Invalid email or password".to_string());
@@ -67,24 +67,24 @@ impl<R: AuthRepositoryTrait> AuthServiceTrait for AuthService<R> {
         Ok(AuthResponse::new(token, user))
     }
 
-    async fn me(&self, user_id: i64) -> AppResult<UserResponse>{
+    async fn get_profile(&self, user_id: i64) -> AppResult<UserResponse>{
         let user = self
             .repo
-            .find_by_id(user_id)
+            .find_user_by_id(user_id)
             .await?
             .ok_or_else(|| AppError::NotFound("User".to_string()))?;
 
         Ok(UserResponse::from(user))
     }
 
-     async fn update(&self, id: i64, req: UpdateUserRequest) -> AppResult<UserResponse> {
+     async fn update_profile(&self, id: i64, req: UpdateUserRequest) -> AppResult<UserResponse> {
         let user = self.repo
-            .find_by_id(id)
+            .find_user_by_id(id)
             .await?
             .ok_or_else(|| AppError::NotFound(format!("User with id {}", id)))?;
 
         if let Some(email) = &req.email {
-            if self.repo.email_exists(email).await? {
+            if self.repo.check_email_exists(email).await? {
                 return Err(AppError::Conflict(format!(
                     "Email '{}' is already registered",
                     email
@@ -92,40 +92,39 @@ impl<R: AuthRepositoryTrait> AuthServiceTrait for AuthService<R> {
             }
         }
         self.repo
-            .update(id, req.name.as_deref(), req.email.as_deref(), req.phone.as_deref())
+            .update_user(id, req.name.as_deref(), req.email.as_deref(), req.phone.as_deref())
             .await?;
         
         Ok(UserResponse::from(user))
     }
 
-    async fn update_photo(&self, user_id: i64, photo_url: &str) -> AppResult<()>{
+    async fn update_profile_photo(&self, user_id: i64, photo_url: &str) -> AppResult<()>{
         self.repo
-            .find_by_id(user_id)
+            .find_user_by_id(user_id)
             .await?
             .ok_or_else(|| AppError::NotFound("User".to_string()))?;
         
-        self.repo.update_photo(user_id, photo_url).await
+        self.repo.update_user_photo(user_id, photo_url).await
     }
 
-    async fn delete_photo(&self, user_id: i64) -> AppResult<()> {
+    async fn delete_profile_photo(&self, user_id: i64) -> AppResult<()> {
         self.repo
-            .find_by_id(user_id)
+            .find_user_by_id(user_id)
             .await?
             .ok_or_else(|| AppError::NotFound("User".to_string()))?;
  
-        self.repo.clear_photo(user_id).await
+        self.repo.clear_user_photo(user_id).await
     }
 
-    async fn update_password(&self, user_id: i64, req: UpdatePasswordRequest) -> AppResult<()> {
+    async fn update_profile_password(&self, user_id: i64, req: UpdatePasswordRequest) -> AppResult<()> {
         self.repo
-            .find_by_id(user_id)
+            .find_user_by_id(user_id)
             .await?
             .ok_or_else(|| AppError::NotFound("User".to_string()))?;
 
         self.repo
-            .update_password(user_id, &req.password)
+            .update_user_password(user_id, &req.password)
             .await?;
-
         Ok(())
     }
 }

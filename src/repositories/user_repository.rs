@@ -4,13 +4,13 @@ use sqlx::PgPool;
 use crate::{errors::{AppError, AppResult}, models::{User, UserWithRole}, response::ListQuery};
 #[async_trait]
 pub trait UserRepositoryTrait: Send + Sync {
-    async fn email_exists(&self, email: &str) -> AppResult<bool>;
-    async fn create(&self, name: &str, email: &str, password_hash: &str, phone: Option<&str>, role: &str) -> AppResult<User>;
-    async fn find_all(&self, query: &ListQuery) -> AppResult<(Vec<UserWithRole>, i64)>;
-    async fn find_by_id(&self, id: i64) -> AppResult<Option<UserWithRole>>;
-    async fn update(&self, id: i64, name: Option<&str>, email: Option<&str>, phone: Option<&str>) -> AppResult<Option<User>>;
-    async fn soft_delete(&self, id: i64) -> AppResult<bool>;
-    async fn hard_delete(&self, id: i64) -> AppResult<bool>;
+    async fn check_email_exists(&self, email: &str) -> AppResult<bool>;
+    async fn create_user(&self, name: &str, email: &str, password_hash: &str, phone: Option<&str>, role: &str) -> AppResult<User>;
+    async fn find_all_users(&self, query: &ListQuery) -> AppResult<(Vec<UserWithRole>, i64)>;
+    async fn find_user_by_id(&self, id: i64) -> AppResult<Option<UserWithRole>>;
+    async fn update_user(&self, id: i64, name: Option<&str>, email: Option<&str>, phone: Option<&str>) -> AppResult<Option<User>>;
+    async fn user_soft_delete(&self, id: i64) -> AppResult<bool>;
+    async fn user_hard_delete(&self, id: i64) -> AppResult<bool>;
 }
 
 
@@ -28,7 +28,7 @@ impl UserRepository {
 
 #[async_trait]
 impl UserRepositoryTrait for UserRepository {
-    async fn email_exists(&self, email: &str) -> AppResult<bool>{
+    async fn check_email_exists(&self, email: &str) -> AppResult<bool>{
         let exists = sqlx::query_scalar!(
             r#"SELECT EXISTS(SELECT 1 FROM users WHERE email = 
             $1 AND deleted_at IS NULL)"#,
@@ -42,7 +42,7 @@ impl UserRepositoryTrait for UserRepository {
     }
 
 
-    async fn create(
+    async fn create_user(
         &self,
         name: &str,
         email: &str,
@@ -98,7 +98,7 @@ impl UserRepositoryTrait for UserRepository {
         Ok(user)
     }
 
-    async fn find_all(&self, query: &ListQuery) -> AppResult<(Vec<UserWithRole>, i64)> {
+    async fn find_all_users(&self, query: &ListQuery) -> AppResult<(Vec<UserWithRole>, i64)> {
         let search_pattern = query
             .search
             .as_ref()
@@ -160,7 +160,7 @@ impl UserRepositoryTrait for UserRepository {
         Ok((items, total))
     }
 
-    async fn find_by_id(&self, id: i64) -> AppResult<Option<UserWithRole>> {
+    async fn find_user_by_id(&self, id: i64) -> AppResult<Option<UserWithRole>> {
         let user = sqlx::query_as!(
             UserWithRole,
             r#"
@@ -191,7 +191,7 @@ impl UserRepositoryTrait for UserRepository {
     Ok(user)
     }
 
-    async fn update(&self, id: i64, name: Option<&str>, email: Option<&str>, phone: Option<&str>) -> AppResult<Option<User>> {
+    async fn update_user(&self, id: i64, name: Option<&str>, email: Option<&str>, phone: Option<&str>) -> AppResult<Option<User>> {
         let user = sqlx::query_as!(
             User,
             r#"
@@ -214,7 +214,7 @@ impl UserRepositoryTrait for UserRepository {
         Ok(user)
     }
 
-    async fn soft_delete(&self, id: i64) -> AppResult<bool> {
+    async fn user_soft_delete(&self, id: i64) -> AppResult<bool> {
         let result = sqlx::query!(
             r#"
             UPDATE users
@@ -229,7 +229,7 @@ impl UserRepositoryTrait for UserRepository {
         Ok(result.rows_affected() > 0)
     }
 
-    async fn hard_delete(&self, id: i64) -> AppResult<bool> {
+    async fn user_hard_delete(&self, id: i64) -> AppResult<bool> {
         let result = sqlx::query!(
             r#"
             DELETE FROM users WHERE id = $1

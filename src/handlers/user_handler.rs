@@ -3,7 +3,7 @@ use validator::Validate;
 
 use crate::{constants::permissions, dtos::{UserResponse, user_dto::{CreateUserRequest, UpdateUserRequest}}, errors::{AppError, AppResult}, middlewares::{AuthUser, require_roles}, response::ApiResponse, state::AppState};
 
-pub async fn create(
+pub async fn create_user(
     State(state): State<AppState>,
     Extension(auth_user): Extension<AuthUser>,
     Json(req): Json<CreateUserRequest>
@@ -12,12 +12,12 @@ pub async fn create(
     req.validate()
         .map_err(|e| AppError::Validation(e.to_string()))?;
 
-    let result: UserResponse = state.services.user.create(req).await?;
+    let result: UserResponse = state.services.user.create_user(req).await?;
 
     Ok(ApiResponse::created("Create user successful", result))
 }
 
-pub async fn update(
+pub async fn update_user(
     State(state): State<AppState>,
     Extension(auth_user): Extension<AuthUser>,
     Path(id): Path<i64>,
@@ -28,7 +28,7 @@ pub async fn update(
     req.validate()
         .map_err(|e| AppError::Validation(e.to_string()))?;
 
-    let result: UserResponse = state.services.user.update(id, req).await?;
+    let result: UserResponse = state.services.user.update_user(id, req).await?;
 
     Ok(ApiResponse::ok("Update user successfull", result))
 }

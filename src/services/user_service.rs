@@ -7,8 +7,8 @@ use crate::{dtos::{UserResponse, user_dto::{CreateUserRequest, UpdateUserRequest
 
 #[async_trait]
 pub trait UserServiceTrait: Send + Sync {
-    async fn create(&self, req: CreateUserRequest) -> AppResult<UserResponse>;
-    async fn update(&self, id: i64, req: UpdateUserRequest) -> AppResult<UserResponse>;
+    async fn create_user(&self, req: CreateUserRequest) -> AppResult<UserResponse>;
+    async fn update_user(&self, id: i64, req: UpdateUserRequest) -> AppResult<UserResponse>;
 }
 
 pub struct UserService<R: UserRepositoryTrait> {
@@ -25,8 +25,8 @@ impl<R: UserRepositoryTrait> UserService<R> {
 
 #[async_trait]
 impl<R: UserRepositoryTrait> UserServiceTrait for UserService<R>  {
-    async fn create(&self, req: CreateUserRequest) -> AppResult<UserResponse> {
-        if self.repo.email_exists(&req.email).await? {
+    async fn create_user(&self, req: CreateUserRequest) -> AppResult<UserResponse> {
+        if self.repo.check_email_exists(&req.email).await? {
             return Err(AppError::Conflict(format!(
                 "Email '{}' is already registered",
                 req.email
@@ -42,12 +42,12 @@ impl<R: UserRepositoryTrait> UserServiceTrait for UserService<R>  {
 
         let user = self
             .repo
-            .create(&req.name, &req.email, &password_hash, req.phone.as_deref(), &req.role)
+            .create_user(&req.name, &req.email, &password_hash, req.phone.as_deref(), &req.role)
             .await?;
 
         let user_with_role = self
             .repo
-            .find_by_id(user.id)
+            .find_user_by_id(user.id)
             .await?
             .ok_or_else(|| AppError::Internal(anyhow::anyhow!("User not found after insert")))?;
 
@@ -56,14 +56,14 @@ impl<R: UserRepositoryTrait> UserServiceTrait for UserService<R>  {
         Ok(UserResponse::from(user_with_role))
     }
 
-    async fn update(&self, id: i64, req: UpdateUserRequest) -> AppResult<UserResponse> {
+    async fn update_user(&self, id: i64, req: UpdateUserRequest) -> AppResult<UserResponse> {
         let user = self.repo
-            .find_by_id(id)
+            .find_user_by_id(id)
             .await?
             .ok_or_else(|| AppError::NotFound(format!("User with id {}", id)))?;
 
         if let Some(email) = &req.email {
-            if self.repo.email_exists(email).await? {
+            if self.repo.check_email_exists(email).await? {
                 return Err(AppError::Conflict(format!(
                     "Email '{}' is already registered",
                     email
@@ -71,9 +71,9 @@ impl<R: UserRepositoryTrait> UserServiceTrait for UserService<R>  {
             }
         }
         self.repo
-            .update(id, req.name.as_deref(), req.email.as_deref(), req.phone.as_deref())
+            .update_user(id, req.name.as_deref(), req.email.as_deref(), req.phone.as_deref())
             .await?;
-        
+
         Ok(UserResponse::from(user))
     }
 }

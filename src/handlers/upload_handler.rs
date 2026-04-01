@@ -70,7 +70,7 @@ pub async fn upload_user_photo(
     state
         .services
         .auth
-        .update_photo(auth_user.id, &upload.secure_url)
+        .update_profile_photo(auth_user.id, &upload.secure_url)
         .await?;
 
     info!(
@@ -92,7 +92,7 @@ pub async fn delete_user_photo(
     State(state): State<AppState>,
     Extension(auth_user): Extension<AuthUser>,
 ) -> AppResult<impl axum::response::IntoResponse> {
-    state.services.auth.delete_photo(auth_user.id).await?;
+    state.services.auth.delete_profile_photo(auth_user.id).await?;
  
     info!(user_id = auth_user.id, "User photo deleted");
  
@@ -117,7 +117,7 @@ pub async fn upload_warehouse_photo(
     state
         .services
         .warehouse
-        .update_photo(warehouse_id, &upload.secure_url, auth_user.id)
+        .update_warehouse_photo(warehouse_id, &upload.secure_url, auth_user.id)
         .await?;
 
     info!(
@@ -146,7 +146,7 @@ pub async fn delete_warehouse_photo(
     state
         .services
         .warehouse
-        .delete_photo(warehouse_id, auth_user.id)
+        .delete_warehouse_photo(warehouse_id, auth_user.id)
         .await?;
  
     info!(
