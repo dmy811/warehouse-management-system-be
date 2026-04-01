@@ -3,11 +3,12 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tracing::info;
 
-use crate::{dtos::{UserResponse, user_dto::CreateUserRequest}, errors::{AppError, AppResult}, repositories::user_repository::UserRepositoryTrait, utils::crypto::hash_password};
+use crate::{dtos::{UserResponse, user_dto::{CreateUserRequest, UpdateUserRequest}}, errors::{AppError, AppResult}, repositories::user_repository::UserRepositoryTrait, utils::crypto::hash_password};
 
 #[async_trait]
 pub trait UserServiceTrait: Send + Sync {
     async fn create(&self, req: CreateUserRequest) -> AppResult<UserResponse>;
+    async fn update(&self, id: i64, req: UpdateUserRequest) -> AppResult<UserResponse>;
 }
 
 pub struct UserService<R: UserRepositoryTrait> {
@@ -53,5 +54,26 @@ impl<R: UserRepositoryTrait> UserServiceTrait for UserService<R>  {
         info!(user_id = user.id, email = %req.email, "New user created");
         
         Ok(UserResponse::from(user_with_role))
+    }
+
+    async fn update(&self, id: i64, req: UpdateUserRequest) -> AppResult<UserResponse> {
+        let user = self.repo
+            .find_by_id(id)
+            .await?
+            .ok_or_else(|| AppError::NotFound(format!("User with id {}", id)))?;
+
+        if let Some(email) = &req.email {
+            if self.repo.email_exists(email).await? {
+                return Err(AppError::Conflict(format!(
+                    "Email '{}' is already registered",
+                    email
+                )));
+            }
+        }
+        self.repo
+            .update(id, req.name.as_deref(), req.email.as_deref(), req.phone.as_deref())
+            .await?;
+        
+        Ok(UserResponse::from(user))
     }
 }
