@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tracing::info;
 
-use crate::{dtos::{CreateWarehouseRequest, UpdateWarehouseRequest, WarehouseResponse, WarehouseSummary, warehouse_dto::UpdateField}, errors::{AppError, AppResult}, repositories::WarehouseRepositoryTrait, response::{PaginatedResponse, ListQuery}};
+use crate::{dtos::{CreateWarehouseRequest, UpdateWarehouseRequest, WarehouseResponse, WarehouseSummary}, errors::{AppError, AppResult}, repositories::WarehouseRepositoryTrait, response::{PaginatedResponse, ListQuery}};
 
 #[async_trait]
 pub trait WarehouseServiceTrait: Send + Sync {
@@ -75,17 +75,22 @@ impl<R: WarehouseRepositoryTrait> WarehouseServiceTrait for WarehouseService<R> 
     }
 
     async fn update(&self, id: i64, req: UpdateWarehouseRequest, actor_id: i64) -> AppResult<WarehouseResponse> {
-        let phone = match &req.phone {
-            UpdateField::NotSet => UpdateField::NotSet,
-            UpdateField::Null => UpdateField::Null,
-            UpdateField::Value(v) => UpdateField::Value(v.as_str()),
-        };
-
-        let photo = match &req.photo {
-            UpdateField::NotSet => UpdateField::NotSet,
-            UpdateField::Null => UpdateField::Null,
-            UpdateField::Value(v) => UpdateField::Value(v.as_str()),
-        };
+        let phone = req.phone.as_deref().and_then(|v| {
+            let v = v.trim();
+            if v.is_empty() {
+                None
+            } else {
+                Some(v)
+            }
+        });
+        let photo = req.photo.as_deref().and_then(|v| {
+            let v = v.trim();
+            if v.is_empty() {
+                None
+            } else {
+                Some(v)
+            }
+        });
 
         self.repo
             .find_by_id(id)

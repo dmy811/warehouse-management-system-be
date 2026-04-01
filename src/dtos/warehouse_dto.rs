@@ -19,35 +19,6 @@ pub struct CreateWarehouseRequest {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub enum UpdateField<T> {
-    NotSet, // tidak update
-    Null, // update ke null
-    Value(T) // update ke value baru
-}
-
-impl<T> UpdateField<T> {
-    pub fn as_ref(&self) -> Option<&T> {
-        match self {
-            UpdateField::Value(v) => Some(v),
-            _ => None
-        }
-    }
-
-    pub fn is_not_set(&self) -> bool{
-        matches!(self, UpdateField::NotSet)
-    }
-
-     pub fn into_parts(self) -> (Option<T>, bool) {
-        match self {
-            // (Value, Clear or not)
-            UpdateField::NotSet => (None, false),
-            UpdateField::Null => (None, true),
-            UpdateField::Value(v) => (Some(v), false),
-        }
-    }
-}
-
-#[derive(Debug, Deserialize, Serialize)]
 pub struct UpdateWarehouseRequest {
     // #[validate(length(min = 2, max = 100, message = "Name must be between 2 and 100 characters"))]
     pub name: Option<String>,
@@ -56,15 +27,15 @@ pub struct UpdateWarehouseRequest {
     pub address: Option<String>,
 
     // #[validate(length(min = 10, max = 15, message = "Phone must be between 10 and 15 digits!"), regex(path = "*PHONE_ID_REGEX", message = "Phone must be a valid Indonesian number (+62xxx or 08xxx)"))]
-    pub phone: UpdateField<String>,
+    pub phone: Option<String>,
 
-    pub photo: UpdateField<String>
+    pub photo: Option<String>
 }
 
 impl UpdateWarehouseRequest {
     // returns true if at least one field is provided
     pub fn is_empty(&self) -> bool {
-        self.name.is_none() && self.address.is_none() && self.phone.is_not_set() && self.photo.is_not_set()
+        self.name.is_none() && self.address.is_none() && self.phone.is_none() && self.photo.is_none()
     }
 
     // custom validation
@@ -83,7 +54,7 @@ impl UpdateWarehouseRequest {
             }
         }
 
-        if let UpdateField::Value(phone) = &self.phone {
+        if let Some(phone) = &self.phone {
             if !PHONE_ID_REGEX.is_match(phone) {
                 errors.push("Phone must be a valid Indonesian number (+62xxx or 08xxx) and between 10 - 15 digits".to_string());
             }
