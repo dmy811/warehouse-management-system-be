@@ -1,6 +1,5 @@
 use axum::{extract::State, response::IntoResponse};
 use serde_json::json;
-use tracing::info;
 
 use crate::{errors::AppResult, response::ApiResponse, state::AppState};
 

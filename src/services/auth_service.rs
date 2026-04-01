@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tracing::{info, warn};
 
-use crate::{dtos::{AuthResponse, LoginRequest, UserResponse, user_dto::UpdateUserRequest}, errors::{AppError, AppResult}, infrastructure::config::Config, repositories::AuthRepositoryTrait, utils::{crypto::{hash_password, verify_password}, jwt::create_token}};
+use crate::{dtos::{AuthResponse, LoginRequest, UserResponse, auth_dto::UpdatePasswordRequest, user_dto::UpdateUserRequest}, errors::{AppError, AppResult}, infrastructure::config::Config, repositories::AuthRepositoryTrait, utils::{crypto::{hash_password, verify_password}, jwt::create_token}};
 
 #[async_trait]
 pub trait AuthServiceTrait: Send + Sync {
@@ -12,6 +12,7 @@ pub trait AuthServiceTrait: Send + Sync {
     async fn update(&self, id: i64, req: UpdateUserRequest) -> AppResult<UserResponse>;
     async fn update_photo(&self, user_id: i64, photo_url: &str) -> AppResult<()>;
     async fn delete_photo(&self, user_id: i64) -> AppResult<()>;
+    async fn update_password(&self, user_id: i64, req: UpdatePasswordRequest) -> AppResult<()>;
 }
 
 pub struct AuthService<R: AuthRepositoryTrait> {
@@ -113,6 +114,19 @@ impl<R: AuthRepositoryTrait> AuthServiceTrait for AuthService<R> {
             .ok_or_else(|| AppError::NotFound("User".to_string()))?;
  
         self.repo.clear_photo(user_id).await
+    }
+
+    async fn update_password(&self, user_id: i64, req: UpdatePasswordRequest) -> AppResult<()> {
+        self.repo
+            .find_by_id(user_id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("User".to_string()))?;
+
+        self.repo
+            .update_password(user_id, &req.password)
+            .await?;
+
+        Ok(())
     }
 }
 

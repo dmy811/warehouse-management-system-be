@@ -25,6 +25,14 @@ pub struct RegisterRequest {
     #[validate(length(min = 8, message = "Password must at least 8"), must_match(other = "password", message = "Password and Confirm Password doesn't match!"))]
     pub password_confirm: String
 }
+#[derive(Debug, Deserialize, Validate)]
+pub struct UpdatePasswordRequest {
+    #[validate(custom(function = "validate_password_strength"))]
+    pub password: String,
+
+    #[validate(length(min = 8, message = "Password must at least 8"), must_match(other = "password", message = "Password and Confirm Password doesn't match!"))]
+    pub password_confirm: String
+}
 
 #[derive(Debug, Deserialize, Validate)]
 pub struct LoginRequest {
