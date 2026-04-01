@@ -3,12 +3,13 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tracing::{info, warn};
 
-use crate::{dtos::{AuthResponse, LoginRequest, UserResponse}, errors::{AppError, AppResult}, infrastructure::config::Config, repositories::AuthRepositoryTrait, utils::{crypto::{hash_password, verify_password}, jwt::create_token}};
+use crate::{dtos::{AuthResponse, LoginRequest, UserResponse, user_dto::UpdateUserRequest}, errors::{AppError, AppResult}, infrastructure::config::Config, repositories::AuthRepositoryTrait, utils::{crypto::{hash_password, verify_password}, jwt::create_token}};
 
 #[async_trait]
 pub trait AuthServiceTrait: Send + Sync {
     async fn login(&self, req: LoginRequest) -> AppResult<AuthResponse>;
     async fn me(&self, user_id: i64) -> AppResult<UserResponse>;
+    async fn update(&self, id: i64, req: UpdateUserRequest) -> AppResult<UserResponse>;
     async fn update_photo(&self, user_id: i64, photo_url: &str) -> AppResult<()>;
     async fn delete_photo(&self, user_id: i64) -> AppResult<()>;
 }
@@ -72,6 +73,27 @@ impl<R: AuthRepositoryTrait> AuthServiceTrait for AuthService<R> {
             .await?
             .ok_or_else(|| AppError::NotFound("User".to_string()))?;
 
+        Ok(UserResponse::from(user))
+    }
+
+     async fn update(&self, id: i64, req: UpdateUserRequest) -> AppResult<UserResponse> {
+        let user = self.repo
+            .find_by_id(id)
+            .await?
+            .ok_or_else(|| AppError::NotFound(format!("User with id {}", id)))?;
+
+        if let Some(email) = &req.email {
+            if self.repo.email_exists(email).await? {
+                return Err(AppError::Conflict(format!(
+                    "Email '{}' is already registered",
+                    email
+                )));
+            }
+        }
+        self.repo
+            .update(id, req.name.as_deref(), req.email.as_deref(), req.phone.as_deref())
+            .await?;
+        
         Ok(UserResponse::from(user))
     }
 
