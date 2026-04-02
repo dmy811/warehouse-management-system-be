@@ -61,3 +61,5 @@ pub async fn delete_warehouse(
     state.services.warehouse.delete_warehouse(id, auth_user.id).await?;
     Ok(ApiResponse::no_content())
 }
+
+pub async assign_warehouse_to_user

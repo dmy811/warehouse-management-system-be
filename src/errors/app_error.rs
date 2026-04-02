@@ -24,7 +24,7 @@ pub enum AppError {
     #[error("{0} not found")]
     NotFound(String),
 
-    #[error("{0} already exists")]
+    #[error("{0}")]
     Conflict(String),
 
     #[error("Validation error: {0}")]

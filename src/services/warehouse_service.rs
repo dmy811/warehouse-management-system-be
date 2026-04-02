@@ -7,13 +7,15 @@ use crate::{dtos::{CreateWarehouseRequest, UpdateWarehouseRequest, WarehouseResp
 
 #[async_trait]
 pub trait WarehouseServiceTrait: Send + Sync {
-    async fn list_all_warehouses(&self, query: ListQuery) -> AppResult<PaginatedResponse<WarehouseSummary>>;
+    async fn get_all_warehouses(&self, query: ListQuery) -> AppResult<PaginatedResponse<WarehouseSummary>>;
     async fn get_warehouse_by_id(&self, id: i64) -> AppResult<WarehouseResponse>;
     async fn create_warehouse(&self, req: CreateWarehouseRequest, actor_id: i64) -> AppResult<WarehouseResponse>;
     async fn update_warehouse(&self, warehouse_id: i64, req: UpdateWarehouseRequest, actor_id: i64) -> AppResult<WarehouseResponse>;
-    async fn delete_warehouse(&self, warehouse_id: i64, actor_id: i64) -> AppResult<()>;
+    async fn delete_warehouse_soft(&self, warehouse_id: i64, actor_id: i64) -> AppResult<()>;
+    async fn delete_warehouse_hard(&self, warehouse_id: i64, actor_id: i64) -> AppResult<()>;
     async fn update_warehouse_photo(&self, warehouse_id: i64, photo_url: &str, actor_id: i64) -> AppResult<()>;
     async fn delete_warehouse_photo(&self, warehouse_id: i64, actor_id: i64) -> AppResult<()>;
+    async fn assign_warehouse_to_user(&self, user_id: i64, warehouse_id: i64) -> AppResult<()>;
 }
 
 pub struct WarehouseService<R: WarehouseRepositoryTrait> {
@@ -30,7 +32,7 @@ impl<R: WarehouseRepositoryTrait> WarehouseService<R> {
 
 #[async_trait]
 impl<R: WarehouseRepositoryTrait> WarehouseServiceTrait for WarehouseService<R> {
-    async fn list_all_warehouses(&self, query: ListQuery) -> AppResult<PaginatedResponse<WarehouseSummary>> {
+    async fn get_all_warehouses(&self, query: ListQuery) -> AppResult<PaginatedResponse<WarehouseSummary>> {
         let (warehouses, total) = self.repo.find_all_warehouses(&query).await?;
 
         let items: Vec<WarehouseSummary> = warehouses
@@ -126,7 +128,7 @@ impl<R: WarehouseRepositoryTrait> WarehouseServiceTrait for WarehouseService<R> 
  
         Ok(WarehouseResponse::from(warehouse))
     }
-    async fn delete_warehouse(&self, warehouse_id: i64, actor_id: i64) -> AppResult<()> {
+    async fn delete_warehouse_soft(&self, warehouse_id: i64, actor_id: i64) -> AppResult<()> {
         self.repo
             .find_warehouse_by_id(warehouse_id)
             .await?
@@ -138,6 +140,23 @@ impl<R: WarehouseRepositoryTrait> WarehouseServiceTrait for WarehouseService<R> 
             warehouse_id = warehouse_id,
             actor_id = actor_id,
             "Warehouse soft-deleted"
+        );
+ 
+        Ok(())
+
+    }
+    async fn delete_warehouse_hard(&self, warehouse_id: i64, actor_id: i64) -> AppResult<()> {
+        self.repo
+            .find_warehouse_by_id(warehouse_id)
+            .await?
+            .ok_or_else(|| AppError::NotFound(format!("Warehouse with id {}", warehouse_id)))?;
+
+        self.repo.warehouse_hard_delete(warehouse_id).await?;
+
+        info!(
+            warehouse_id = warehouse_id,
+            actor_id = actor_id,
+            "Warehouse hard-deleted"
         );
  
         Ok(())
@@ -175,5 +194,25 @@ impl<R: WarehouseRepositoryTrait> WarehouseServiceTrait for WarehouseService<R> 
         );
  
         Ok(())
+    }
+
+    async fn assign_warehouse_to_user(&self, user_id: i64, warehouse_id: i64) -> AppResult<()> {
+        if self.repo.check_user_existing(user_id).await? {
+            return Err(AppError::NotFound(format!("User with id {}", user_id)))
+        }
+
+        self.repo
+            .find_warehouse_by_id(warehouse_id)
+            .await?
+            .ok_or_else(|| AppError::NotFound(format!("Warehouse with id {}", warehouse_id)))?;
+
+        if self.repo.check_existing_warehouse_in_user(user_id, warehouse_id).await? {
+            return Err(AppError::Conflict(format!("Warehouse with id {} is already assign to user with id {}", warehouse_id, user_id)));
+        }
+
+        self.repo.assign_warehouse_to_user(user_id, warehouse_id).await?;
+
+        Ok(())
+
     }
 }

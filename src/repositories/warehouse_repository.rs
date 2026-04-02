@@ -3,7 +3,7 @@ use sqlx::PgPool;
 
 use crate::{
     errors::AppResult,
-    models::{Warehouse, WarehouseWithStats},
+    models::{UserWithRole, Warehouse, WarehouseWithStats},
     response::ListQuery
 };
 
@@ -15,8 +15,12 @@ pub trait WarehouseRepositoryTrait: Send + Sync {
     async fn create_warehouse(&self, name: &str, address: &str, phone: Option<&str>, photo: Option<&str>) -> AppResult<Warehouse>;
     async fn update_warehouse(&self, warehouse_id: i64, name: Option<&str>, address: Option<&str>, phone: Option<&str>, photo: Option<&str>) -> AppResult<Option<Warehouse>>;
     async fn warehouse_soft_delete(&self, warehouse_id: i64) -> AppResult<bool>;
+    async fn warehouse_hard_delete(&self, warehouse_id: i64) -> AppResult<bool>;
     async fn update_warehouse_photo(&self, warehouse_id: i64, photo_url: &str) -> AppResult<()>;
     async fn clear_warehouse_photo(&self, warehouse_id: i64) -> AppResult<()>;
+    async fn assign_warehouse_to_user(&self, user_id: i64, warehouse_id: i64) -> AppResult<()>;
+    async fn check_existing_warehouse_in_user(&self, user_id: i64, warehouse_id: i64) -> AppResult<bool>;
+    async fn check_user_existing(&self, user_id: i64) -> AppResult<bool>;
 }
 
 pub struct WarehouseRepository {
@@ -52,7 +56,7 @@ impl WarehouseRepositoryTrait for WarehouseRepository {
                 w.photo,
                 w.deleted_at,
                 w.created_at,
-                w.updated_at,
+                w.updated_at,warehouse_id
                 COUNT(DISTINCT i.product_id)   AS total_products,
                 COUNT(DISTINCT r.id)           AS total_racks
             FROM warehouses w
@@ -193,6 +197,20 @@ impl WarehouseRepositoryTrait for WarehouseRepository {
         Ok(result.rows_affected() > 0)
     }
 
+        async fn warehouse_hard_delete(&self, warehouse_id: i64) -> AppResult<bool> {
+            let result = sqlx::query!(
+                r#"
+                DELETE FROM warehouses
+                WHERE id = $1
+                "#,
+                warehouse_id
+            )
+            .execute(&self.db)
+            .await?;
+
+            Ok(result.rows_affected() > 0)
+        }
+
     async fn update_warehouse_photo(&self, warehouse_id: i64, photo_url: &str) -> AppResult<()> {
         sqlx::query!(
             r#"
@@ -222,5 +240,55 @@ impl WarehouseRepositoryTrait for WarehouseRepository {
         .await?;
  
         Ok(())
+    }
+
+    async fn assign_warehouse_to_user(&self, user_id: i64, warehouse_id: i64) -> AppResult<()> {
+        sqlx::query!(
+            r#"
+            INSERT into user_warehouses (user_id, warehouse_id)
+            VALUES ($1, $2)
+            "#,
+            user_id,
+            warehouse_id
+        )
+        .execute(&self.db)
+        .await?;
+
+        Ok(())
+    }
+
+    async fn check_existing_warehouse_in_user(&self, user_id: i64, warehouse_id: i64) -> AppResult<bool> {
+        let exists = sqlx::query_scalar!(
+            r#"
+            SELECT EXISTS(
+                SELECT 1 FROM user_warehouses
+                WHERE user_id = $1 AND warehouse_id = $2
+            )
+            "#,
+            user_id,
+            warehouse_id
+        )
+        .fetch_one(&self.db)
+        .await?
+        .unwrap_or(false);
+        
+        Ok(exists)
+    }
+
+    async fn check_user_existing(&self, user_id: i64) -> AppResult<bool> {
+        let exists = sqlx::query_scalar!(
+            r#"
+            SELECT EXISTS(
+                SELECT 1 FROM users
+                WHERE id = $1 AND deleted_at IS NULL
+            )
+            "#,
+            user_id
+        )
+        .fetch_one(&self.db)
+        .await?
+        .unwrap_or(false);
+
+        Ok(exists)
     }
 }
