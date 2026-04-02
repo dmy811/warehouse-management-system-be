@@ -31,9 +31,9 @@ impl<R: WarehouseRepositoryTrait> WarehouseService<R> {
 #[async_trait]
 impl<R: WarehouseRepositoryTrait> WarehouseServiceTrait for WarehouseService<R> {
     async fn list_all_warehouses(&self, query: ListQuery) -> AppResult<PaginatedResponse<WarehouseSummary>> {
-        let (warehouse, total) = self.repo.find_all_warehouses(&query).await?;
+        let (warehouses, total) = self.repo.find_all_warehouses(&query).await?;
 
-        let items: Vec<WarehouseSummary> = warehouse
+        let items: Vec<WarehouseSummary> = warehouses
             .into_iter() // into_iter() means take ownership from every element in collection (Vec), if it use iter() means borrow (&T), if it use iter_mut() means borrow mutable (&mut T)
             .map(WarehouseSummary::from) // it same as like .map(|w| WarehouseSummary::from(w))
             .collect(); // change iterator into Vec

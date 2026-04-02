@@ -3,11 +3,12 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tracing::info;
 
-use crate::{dtos::{UserResponse, user_dto::{CreateUserRequest, UpdateUserRequest}}, errors::{AppError, AppResult}, repositories::user_repository::UserRepositoryTrait, utils::crypto::hash_password};
+use crate::{dtos::{UserResponse, user_dto::{CreateUserRequest, UpdateUserRequest}}, errors::{AppError, AppResult}, repositories::user_repository::UserRepositoryTrait, response::{ListQuery, PaginatedResponse}, utils::crypto::hash_password};
 
 #[async_trait]
 pub trait UserServiceTrait: Send + Sync {
     async fn create_user(&self, req: CreateUserRequest) -> AppResult<UserResponse>;
+    async fn list_all_users(&self, query: ListQuery) -> AppResult<PaginatedResponse<UserResponse>>;
     async fn update_user(&self, id: i64, req: UpdateUserRequest) -> AppResult<UserResponse>;
 }
 
@@ -54,6 +55,18 @@ impl<R: UserRepositoryTrait> UserServiceTrait for UserService<R>  {
         info!(user_id = user.id, email = %req.email, "New user created");
         
         Ok(UserResponse::from(user_with_role))
+    }
+
+    async fn list_all_users(&self, query: ListQuery) -> AppResult<PaginatedResponse<UserResponse>> {
+        let (users, total) = self.repo.find_all_users(&query).await?;
+
+        let items: Vec<UserResponse> = users
+            .into_iter()
+            .map(UserResponse::from)
+            .collect();
+
+        Ok(PaginatedResponse::new(items, total, query.page, query.per_page))
+
     }
 
     async fn update_user(&self, id: i64, req: UpdateUserRequest) -> AppResult<UserResponse> {
