@@ -59,10 +59,7 @@ impl WarehouseRepositoryTrait for WarehouseRepository {
             LEFT JOIN inventories i ON i.warehouse_id = w.id
             LEFT JOIN racks r       ON r.warehouse_id = w.id AND r.deleted_at IS NULL
             WHERE w.deleted_at IS NULL
-              AND ($1::TEXT IS NULL OR (
-                  LOWER(w.name)    LIKE $1
-               OR LOWER(w.address) LIKE $1
-              ))
+              AND ($1::TEXT IS NULL OR (LOWER(w.name) LIKE $1 OR LOWER(w.address) LIKE $1))
             GROUP BY w.id
             ORDER BY {sort_col} {sort_dir}
             LIMIT $2
@@ -81,10 +78,7 @@ impl WarehouseRepositoryTrait for WarehouseRepository {
             SELECT COUNT(*)
             FROM warehouses w
             WHERE w.deleted_at IS NULL
-              AND ($1::TEXT IS NULL OR (
-                  LOWER(w.name)    LIKE $1
-               OR LOWER(w.address) LIKE $1
-              ))
+              AND ($1::TEXT IS NULL OR (LOWER(w.name) LIKE $1 OR LOWER(w.address) LIKE $1))
         "#;
  
         let total: i64 = sqlx::query_scalar(count_sql)

@@ -1,7 +1,7 @@
-use axum::{Extension, Json, extract::{Path, State}, response::IntoResponse};
+use axum::{Extension, Json, extract::{Path, Query, State}, response::IntoResponse};
 use validator::Validate;
 
-use crate::{constants::permissions, dtos::{UserResponse, user_dto::{CreateUserRequest, UpdateUserRequest}}, errors::{AppError, AppResult}, middlewares::{AuthUser, require_roles}, response::ApiResponse, state::AppState};
+use crate::{constants::permissions, dtos::{UserResponse, user_dto::{CreateUserRequest, UpdateUserRequest}}, errors::{AppError, AppResult}, middlewares::{AuthUser, require_roles}, response::{ApiResponse, ListQuery, PaginatedResponse}, state::AppState};
 
 pub async fn create_user(
     State(state): State<AppState>,
@@ -15,6 +15,16 @@ pub async fn create_user(
     let result: UserResponse = state.services.user.create_user(req).await?;
 
     Ok(ApiResponse::created("Create user successful", result))
+}
+
+pub async fn list_all_users(
+    State(state): State<AppState>,
+    Extension(auth_user): Extension<AuthUser>,
+    Query(query): Query<ListQuery>
+) -> AppResult<impl IntoResponse> {
+    require_roles(permissions::CAN_MANAGE_MASTER)(auth_user.clone())?;
+    let result: PaginatedResponse<UserResponse> = state.services.user.list_all_users(query).await?;
+    Ok(result)
 }
 
 pub async fn update_user(
