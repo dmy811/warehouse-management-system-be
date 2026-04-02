@@ -125,3 +125,8 @@ impl From<WarehouseWithStats> for WarehouseSummary {
         }
     }
 }
+
+#[derive(Deserialize)]
+pub struct DeleteWarehouseQuery {
+    pub mode: Option<String>
+}

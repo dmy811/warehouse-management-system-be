@@ -1,14 +1,15 @@
 use axum::{Extension, Json, extract::{Path, Query, State}, response::IntoResponse};
+use serde_json::Value;
 use validator::Validate;
 
-use crate::{constants::permissions, dtos::{CreateWarehouseRequest, UpdateWarehouseRequest, WarehouseResponse, WarehouseSummary}, errors::{AppError, AppResult}, middlewares::{AuthUser, require_roles}, response::{ApiResponse, PaginatedResponse, ListQuery}, state::AppState};
+use crate::{constants::permissions, dtos::{CreateWarehouseRequest, UpdateWarehouseRequest, WarehouseResponse, WarehouseSummary, warehouse_dto::DeleteWarehouseQuery}, errors::{AppError, AppResult}, middlewares::{AuthUser, require_roles}, response::{ApiResponse, ListQuery, PaginatedResponse}, state::AppState};
 
 pub async fn list_all_warehouses(
     State(state): State<AppState>,
     Extension(_auth_user): Extension<AuthUser>,
     Query(query): Query<ListQuery>
 ) -> AppResult<impl IntoResponse> {
-    let result: PaginatedResponse<WarehouseSummary> = state.services.warehouse.list_all_warehouses(query).await?;
+    let result: PaginatedResponse<WarehouseSummary> = state.services.warehouse.get_all_warehouses(query).await?;
     Ok(result)
 }
 
@@ -55,11 +56,24 @@ pub async fn delete_warehouse(
     State(state): State<AppState>,
     Extension(auth_user): Extension<AuthUser>,
     Path(id): Path<i64>,
+    Query(query): Query<DeleteWarehouseQuery>
 ) -> AppResult<impl axum::response::IntoResponse> {
     require_roles(permissions::CAN_MANAGE_USERS)(auth_user.clone())?;
- 
-    state.services.warehouse.delete_warehouse(id, auth_user.id).await?;
-    Ok(ApiResponse::no_content())
+
+    let mode = query.mode.as_deref().unwrap_or("soft");
+
+    let message = match mode {
+        "hard" => {
+            state.services.warehouse.delete_warehouse_soft(id, auth_user.id).await?;
+            "Warehouse permanenlty deleted successfully"
+        }
+        _ => {
+            state.services.warehouse.delete_warehouse_hard(id, auth_user.id).await?;
+            "Warehouse soft deleted successfully"
+        }
+    };
+
+    Ok(ApiResponse::ok(message, Value::Null))
 }
 
-pub async assign_warehouse_to_user
+// pub async assign_warehouse_to_user
