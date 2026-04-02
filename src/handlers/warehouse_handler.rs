@@ -43,7 +43,7 @@ pub async fn update_warehouse(
     Extension(auth_user): Extension<AuthUser>,
     Path(id): Path<i64>,
     Json(req): Json<UpdateWarehouseRequest>,
-) -> AppResult<impl axum::response::IntoResponse> {
+) -> AppResult<impl IntoResponse> {
     require_roles(permissions::CAN_MANAGE_MASTER)(auth_user.clone())?;
  
     req.validate()?;
@@ -57,7 +57,7 @@ pub async fn delete_warehouse(
     Extension(auth_user): Extension<AuthUser>,
     Path(id): Path<i64>,
     Query(query): Query<DeleteWarehouseQuery>
-) -> AppResult<impl axum::response::IntoResponse> {
+) -> AppResult<impl IntoResponse> {
     require_roles(permissions::CAN_MANAGE_USERS)(auth_user.clone())?;
 
     let mode = query.mode.as_deref().unwrap_or("soft");
@@ -76,4 +76,17 @@ pub async fn delete_warehouse(
     Ok(ApiResponse::ok(message, Value::Null))
 }
 
-// pub async assign_warehouse_to_user
+pub async fn assign_warehouse_to_user(
+    State(state): State<AppState>,
+    Extension(auth_user): Extension<AuthUser>,
+    Path((id, user_id)): Path<(i64, i64)>
+) -> AppResult<impl IntoResponse> {
+    require_roles(permissions::CAN_MANAGE_MASTER)(auth_user.clone())?;
+
+    state.services.warehouse.assign_warehouse_to_user(user_id, id).await?;
+
+    Ok(ApiResponse::ok("Successfully assigned warehouse", serde_json::json!({
+        "user_id": user_id,
+        "warehouse_id": id
+    })))
+}
