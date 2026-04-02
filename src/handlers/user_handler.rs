@@ -27,6 +27,18 @@ pub async fn list_all_users(
     Ok(result)
 }
 
+pub async fn find_user_by_id(
+    State(state): State<AppState>,
+    Extension(auth_user): Extension<AuthUser>,
+    Path(id): Path<i64> 
+) -> AppResult<impl IntoResponse> {
+    require_roles(permissions::CAN_MANAGE_USERS)(auth_user.clone())?;
+
+    let result = state.services.user.find_user_by_id(id).await?;
+
+    Ok(ApiResponse::ok("User retrieved", result))
+}
+
 pub async fn update_user(
     State(state): State<AppState>,
     Extension(auth_user): Extension<AuthUser>,
