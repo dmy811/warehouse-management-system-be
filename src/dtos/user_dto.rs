@@ -49,3 +49,8 @@ impl UpdateUserRequest {
         Ok(())
     }
 }
+
+#[derive(Deserialize)]
+pub struct DeleteUserQuery {
+    pub mode: Option<String>
+}

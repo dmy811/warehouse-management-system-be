@@ -9,8 +9,10 @@ use crate::{dtos::{UserResponse, user_dto::{CreateUserRequest, UpdateUserRequest
 pub trait UserServiceTrait: Send + Sync {
     async fn create_user(&self, req: CreateUserRequest) -> AppResult<UserResponse>;
     async fn list_all_users(&self, query: ListQuery) -> AppResult<PaginatedResponse<UserResponse>>;
-    async fn find_user_by_id(&self, id: i64) -> AppResult<UserResponse>;
-    async fn update_user(&self, id: i64, req: UpdateUserRequest) -> AppResult<UserResponse>;
+    async fn find_user_by_id(&self, user_id: i64) -> AppResult<UserResponse>;
+    async fn update_user(&self, user_id: i64, req: UpdateUserRequest) -> AppResult<UserResponse>;
+    async fn user_soft_delete(&self, user_id: i64) -> AppResult<()>;
+    async fn user_hard_delete(&self, user_id: i64) -> AppResult<()>;
 }
 
 pub struct UserService<R: UserRepositoryTrait> {
@@ -70,20 +72,20 @@ impl<R: UserRepositoryTrait> UserServiceTrait for UserService<R>  {
 
     }
 
-    async fn find_user_by_id(&self, id: i64) -> AppResult<UserResponse> {
+    async fn find_user_by_id(&self, user_id: i64) -> AppResult<UserResponse> {
         let user = self.repo
-            .find_user_by_id(id)
+            .find_user_by_id(user_id)
             .await?
-            .ok_or_else(|| AppError::NotFound(format!("User with id {}", id)))?;
+            .ok_or_else(|| AppError::NotFound(format!("User with id {}", user_id)))?;
 
         Ok(UserResponse::from(user))
     }
 
-    async fn update_user(&self, id: i64, req: UpdateUserRequest) -> AppResult<UserResponse> {
+    async fn update_user(&self, user_id: i64, req: UpdateUserRequest) -> AppResult<UserResponse> {
         let user = self.repo
-            .find_user_by_id(id)
+            .find_user_by_id(user_id)
             .await?
-            .ok_or_else(|| AppError::NotFound(format!("User with id {}", id)))?;
+            .ok_or_else(|| AppError::NotFound(format!("User with id {}", user_id)))?;
 
         if let Some(email) = &req.email {
             if self.repo.check_email_exists(email).await? {
@@ -94,9 +96,36 @@ impl<R: UserRepositoryTrait> UserServiceTrait for UserService<R>  {
             }
         }
         self.repo
-            .update_user(id, req.name.as_deref(), req.email.as_deref(), req.phone.as_deref())
+            .update_user(user_id, req.name.as_deref(), req.email.as_deref(), req.phone.as_deref())
             .await?;
 
         Ok(UserResponse::from(user))
+    }
+
+    async fn user_soft_delete(&self, user_id: i64) -> AppResult<()> {
+        self.repo
+            .find_user_by_id(user_id)
+            .await?
+            .ok_or_else(|| AppError::NotFound(format!("User with id {}", user_id)))?;
+
+        self.repo.user_soft_delete(user_id).await?;
+
+
+        info!(user_id = user_id, "User soft deleted");
+
+        Ok(())
+    }
+    async fn user_hard_delete(&self, user_id: i64) -> AppResult<()> {
+        self.repo
+            .find_user_by_id(user_id)
+            .await?
+            .ok_or_else(|| AppError::NotFound(format!("User with id {}", user_id)))?;
+
+        self.repo.user_hard_delete(user_id).await?;
+
+
+        info!(user_id = user_id, "User hard deleted");
+
+        Ok(())
     }
 }

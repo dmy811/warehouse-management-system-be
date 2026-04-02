@@ -7,10 +7,10 @@ pub trait UserRepositoryTrait: Send + Sync {
     async fn check_email_exists(&self, email: &str) -> AppResult<bool>;
     async fn create_user(&self, name: &str, email: &str, password_hash: &str, phone: Option<&str>, role: &str) -> AppResult<User>;
     async fn find_all_users(&self, query: &ListQuery) -> AppResult<(Vec<UserWithRole>, i64)>;
-    async fn find_user_by_id(&self, id: i64) -> AppResult<Option<UserWithRole>>;
-    async fn update_user(&self, id: i64, name: Option<&str>, email: Option<&str>, phone: Option<&str>) -> AppResult<Option<User>>;
-    async fn user_soft_delete(&self, id: i64) -> AppResult<bool>;
-    async fn user_hard_delete(&self, id: i64) -> AppResult<bool>;
+    async fn find_user_by_id(&self, user_id: i64) -> AppResult<Option<UserWithRole>>;
+    async fn update_user(&self, user_id: i64, name: Option<&str>, email: Option<&str>, phone: Option<&str>) -> AppResult<Option<User>>;
+    async fn user_soft_delete(&self, user_id: i64) -> AppResult<bool>;
+    async fn user_hard_delete(&self, user_id: i64) -> AppResult<bool>;
 }
 
 
@@ -154,7 +154,7 @@ impl UserRepositoryTrait for UserRepository {
         Ok((items, total))
     }
 
-    async fn find_user_by_id(&self, id: i64) -> AppResult<Option<UserWithRole>> {
+    async fn find_user_by_id(&self, user_id: i64) -> AppResult<Option<UserWithRole>> {
         let user = sqlx::query_as!(
             UserWithRole,
             r#"
@@ -177,7 +177,7 @@ impl UserRepositoryTrait for UserRepository {
             GROUP BY u.id
             LIMIT 1
             "#,
-            id
+            user_id
         )
         .fetch_optional(&self.db)
         .await?;
@@ -185,7 +185,7 @@ impl UserRepositoryTrait for UserRepository {
     Ok(user)
     }
 
-    async fn update_user(&self, id: i64, name: Option<&str>, email: Option<&str>, phone: Option<&str>) -> AppResult<Option<User>> {
+    async fn update_user(&self, user_id: i64, name: Option<&str>, email: Option<&str>, phone: Option<&str>) -> AppResult<Option<User>> {
         let user = sqlx::query_as!(
             User,
             r#"
@@ -197,7 +197,7 @@ impl UserRepositoryTrait for UserRepository {
             AND deleted_at IS NULL
             RETURNING *
             "#,
-            id,
+            user_id,
             name,
             email,
             phone
@@ -208,14 +208,14 @@ impl UserRepositoryTrait for UserRepository {
         Ok(user)
     }
 
-    async fn user_soft_delete(&self, id: i64) -> AppResult<bool> {
+    async fn user_soft_delete(&self, user_id: i64) -> AppResult<bool> {
         let result = sqlx::query!(
             r#"
             UPDATE users
             SET deleted_at = NOW()
             WHERE id = $1 AND deleted_at IS NULL
             "#,
-            id
+            user_id
         )
         .execute(&self.db)
         .await?;
@@ -223,12 +223,12 @@ impl UserRepositoryTrait for UserRepository {
         Ok(result.rows_affected() > 0)
     }
 
-    async fn user_hard_delete(&self, id: i64) -> AppResult<bool> {
+    async fn user_hard_delete(&self, user_id: i64) -> AppResult<bool> {
         let result = sqlx::query!(
             r#"
             DELETE FROM users WHERE id = $1
             "#,
-            id
+            user_id
         )
         .execute(&self.db)
         .await?;

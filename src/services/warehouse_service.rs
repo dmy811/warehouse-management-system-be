@@ -10,10 +10,10 @@ pub trait WarehouseServiceTrait: Send + Sync {
     async fn list_all_warehouses(&self, query: ListQuery) -> AppResult<PaginatedResponse<WarehouseSummary>>;
     async fn get_warehouse_by_id(&self, id: i64) -> AppResult<WarehouseResponse>;
     async fn create_warehouse(&self, req: CreateWarehouseRequest, actor_id: i64) -> AppResult<WarehouseResponse>;
-    async fn update_warehouse(&self, id: i64, req: UpdateWarehouseRequest, actor_id: i64) -> AppResult<WarehouseResponse>;
-    async fn delete_warehouse(&self, id: i64, actor_id: i64) -> AppResult<()>;
-    async fn update_warehouse_photo(&self, id: i64, photo_url: &str, actor_id: i64) -> AppResult<()>;
-    async fn delete_warehouse_photo(&self, id: i64, actor_id: i64) -> AppResult<()>;
+    async fn update_warehouse(&self, warehouse_id: i64, req: UpdateWarehouseRequest, actor_id: i64) -> AppResult<WarehouseResponse>;
+    async fn delete_warehouse(&self, warehouse_id: i64, actor_id: i64) -> AppResult<()>;
+    async fn update_warehouse_photo(&self, warehouse_id: i64, photo_url: &str, actor_id: i64) -> AppResult<()>;
+    async fn delete_warehouse_photo(&self, warehouse_id: i64, actor_id: i64) -> AppResult<()>;
 }
 
 pub struct WarehouseService<R: WarehouseRepositoryTrait> {
@@ -41,12 +41,12 @@ impl<R: WarehouseRepositoryTrait> WarehouseServiceTrait for WarehouseService<R> 
         Ok(PaginatedResponse::new(items, total, query.page, query.per_page))
     }
 
-    async fn get_warehouse_by_id(&self, id: i64) -> AppResult<WarehouseResponse> {
+    async fn get_warehouse_by_id(&self, warehouse_id: i64) -> AppResult<WarehouseResponse> {
         let warehouse = self
             .repo
-            .find_warehouse_by_id(id)
+            .find_warehouse_by_id(warehouse_id)
             .await?
-            .ok_or_else(|| AppError::NotFound(format!("Warehouse with id {}", id)))?;
+            .ok_or_else(|| AppError::NotFound(format!("Warehouse with id {}", warehouse_id)))?;
 
         Ok(WarehouseResponse::from(warehouse))
     }
@@ -74,7 +74,7 @@ impl<R: WarehouseRepositoryTrait> WarehouseServiceTrait for WarehouseService<R> 
         Ok(WarehouseResponse::from(warehouse))
     }
 
-    async fn update_warehouse(&self, id: i64, req: UpdateWarehouseRequest, actor_id: i64) -> AppResult<WarehouseResponse> {
+    async fn update_warehouse(&self, warehouse_id: i64, req: UpdateWarehouseRequest, actor_id: i64) -> AppResult<WarehouseResponse> {
         let phone = req.phone.as_deref().and_then(|v| {
             let v = v.trim();
             if v.is_empty() {
@@ -93,12 +93,12 @@ impl<R: WarehouseRepositoryTrait> WarehouseServiceTrait for WarehouseService<R> 
         });
 
         self.repo
-            .find_warehouse_by_id(id)
+            .find_warehouse_by_id(warehouse_id)
             .await?
-            .ok_or_else(|| AppError::NotFound(format!("Warehouse with id {}", id)))?;
+            .ok_or_else(|| AppError::NotFound(format!("Warehouse with id {}", warehouse_id)))?;
 
         if let Some(ref name) = req.name {
-            if self.repo.check_name_exists(name, Some(id)).await? {
+            if self.repo.check_name_exists(name, Some(warehouse_id)).await? {
                 return Err(AppError::Conflict(format!(
                     "Warehouse with name '{}' already exists",
                     name
@@ -109,33 +109,33 @@ impl<R: WarehouseRepositoryTrait> WarehouseServiceTrait for WarehouseService<R> 
         let warehouse = self
             .repo
             .update_warehouse(
-                id,
+                warehouse_id,
                 req.name.as_deref(),
                 req.address.as_deref(),
                 phone,
                 photo
             )
             .await?
-            .ok_or_else(|| AppError::NotFound(format!("Warehouse with id {}", id)))?;
+            .ok_or_else(|| AppError::NotFound(format!("Warehouse with id {}", warehouse_id)))?;
 
         info!(
-            warehouse_id = id,
+            warehouse_id = warehouse_id,
             actor_id = actor_id,
             "Warehouse updated"
         );
  
         Ok(WarehouseResponse::from(warehouse))
     }
-    async fn delete_warehouse(&self, id: i64, actor_id: i64) -> AppResult<()> {
+    async fn delete_warehouse(&self, warehouse_id: i64, actor_id: i64) -> AppResult<()> {
         self.repo
-            .find_warehouse_by_id(id)
+            .find_warehouse_by_id(warehouse_id)
             .await?
-            .ok_or_else(|| AppError::NotFound(format!("Warehouse with id {}", id)))?;
+            .ok_or_else(|| AppError::NotFound(format!("Warehouse with id {}", warehouse_id)))?;
 
-        self.repo.warehouse_soft_delete(id).await?;
+        self.repo.warehouse_soft_delete(warehouse_id).await?;
 
         info!(
-            warehouse_id = id,
+            warehouse_id = warehouse_id,
             actor_id = actor_id,
             "Warehouse soft-deleted"
         );
@@ -143,16 +143,16 @@ impl<R: WarehouseRepositoryTrait> WarehouseServiceTrait for WarehouseService<R> 
         Ok(())
 
     }
-    async fn update_warehouse_photo(&self, id: i64, photo_url: &str, actor_id: i64) -> AppResult<()> {
+    async fn update_warehouse_photo(&self, warehouse_id: i64, photo_url: &str, actor_id: i64) -> AppResult<()> {
         self.repo
-            .find_warehouse_by_id(id)
+            .find_warehouse_by_id(warehouse_id)
             .await?
-            .ok_or_else(|| AppError::NotFound(format!("Warehouse with id {}", id)))?;
+            .ok_or_else(|| AppError::NotFound(format!("Warehouse with id {}", warehouse_id)))?;
         
-        self.repo.update_warehouse_photo(id, photo_url).await?;
+        self.repo.update_warehouse_photo(warehouse_id, photo_url).await?;
  
         info!(
-            warehouse_id = id,
+            warehouse_id = warehouse_id,
             actor_id = actor_id,
             photo_url = photo_url,
             "Warehouse photo updated"
@@ -160,16 +160,16 @@ impl<R: WarehouseRepositoryTrait> WarehouseServiceTrait for WarehouseService<R> 
  
         Ok(())
     }
-    async fn delete_warehouse_photo(&self, id: i64, actor_id: i64) -> AppResult<()> {
+    async fn delete_warehouse_photo(&self, warehouse_id: i64, actor_id: i64) -> AppResult<()> {
         self.repo
-            .find_warehouse_by_id(id)
+            .find_warehouse_by_id(warehouse_id)
             .await?
-            .ok_or_else(|| AppError::NotFound(format!("Warehouse with id {}", id)))?;
+            .ok_or_else(|| AppError::NotFound(format!("Warehouse with id {}", warehouse_id)))?;
 
-        self.repo.clear_warehouse_photo(id).await?;
+        self.repo.clear_warehouse_photo(warehouse_id).await?;
  
         info!(
-            warehouse_id = id,
+            warehouse_id = warehouse_id,
             actor_id = actor_id,
             "Warehouse photo deleted"
         );
