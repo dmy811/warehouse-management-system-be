@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -38,6 +38,16 @@ pub struct UserWithRole {
     pub deleted_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AccessTokenClaims {
+    pub sub: String,
+    pub roles: Vec<String>,
+    pub jti: String,      // token id
+    pub exp: i64,
+    pub iat: i64,
+    pub version: i32,
 }
 
 #[derive(Debug, Clone, FromRow)]
