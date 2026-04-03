@@ -3,3 +3,4 @@ pub mod health_handler;
 pub mod warehouse_handler;
 pub mod upload_handler;
 pub mod user_handler;
+pub mod rack_handler;

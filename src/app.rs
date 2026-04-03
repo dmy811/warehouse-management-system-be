@@ -16,6 +16,7 @@ pub async fn build_with_pool(pool: PgPool, config: Config) -> Router {
 
     let cors = CorsLayer::new()
         .allow_origin(Any)
+        .allow_credentials(true)
         .allow_methods(Any)
         .allow_headers(Any);
 

@@ -18,7 +18,7 @@ pub async fn request_id_middleware(
         .get(headers::REQUEST_ID)
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_owned())
-        .unwrap_or_else(|| Uuid::new_v4().to_string());
+        .unwrap_or_else(|| Uuid::now_v7().to_string());
 
     req.extensions_mut().insert(RequestId(request_id.clone())); // bisa diakses di tempate lain dengan req.extensions().get::<RequestId>()
 
