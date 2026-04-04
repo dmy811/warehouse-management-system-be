@@ -6,7 +6,7 @@ pub fn init_logger(config: &Config) {
     let env_filter = EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| EnvFilter::new("info,sqlx=warn,tower_http=debug"));
 
-    match config.app_env {
+    match config.app.env {
         AppEnv::Production => {
             tracing_subscriber::registry()
                 .with(env_filter)

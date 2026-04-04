@@ -64,51 +64,51 @@ use crate::models::users::AccessTokenClaims;
 
 // cargo run --bin generate_keys
 
-pub struct AccessTokenService {
-    symmetric_key: SymmetricKey<V4>,
-    ttl_seconds: i64
-}
+// pub struct AccessTokenService {
+//     symmetric_key: SymmetricKey<V4>,
+//     ttl_seconds: i64
+// }
 
-impl AccessTokenService {
-    pub fn new(config: &Config) -> AppResult<Self> {
-        let key_bytes = &config.paseto_symmetric_key;
-        if key_bytes.len() != 32 {
-            return Err(AppError::Internal(anyhow::anyhow!(format!(
-                "PASETO v4 key must be 32 bytes, got {}",
-                key_bytes.len()
-            ))));
-        }
+// impl AccessTokenService {
+//     pub fn new(config: &Config) -> AppResult<Self> {
+//         let key_bytes = &config.paseto_symmetric_key;
+//         if key_bytes.len() != 32 {
+//             return Err(AppError::Internal(anyhow::anyhow!(format!(
+//                 "PASETO v4 key must be 32 bytes, got {}",
+//                 key_bytes.len()
+//             ))));
+//         }
 
-        let symmetric_key = SymmetricKey::<V4>::from(key_bytes.as_slice())
-            .map_err(|e| AppError::Internal(anyhow::anyhow!(format!("Generating paseto symetric key error: {}", e))))?;
+//         let symmetric_key = SymmetricKey::<V4>::from(key_bytes.as_slice())
+//             .map_err(|e| AppError::Internal(anyhow::anyhow!(format!("Generating paseto symetric key error: {}", e))))?;
 
-        Ok(Self {
-            symmetric_key,
-            ttl_seconds: config.access_token_ttl_seconds,
-        })
+//         Ok(Self {
+//             symmetric_key,
+//             ttl_seconds: config.access_token_ttl_seconds,
+//         })
 
-    }
+//     }
 
-    pub fn generate_access_token(&self, user: &UserWithRole) -> AppResult<(String, String)> {
-        let token_id = Uuid::now_v7().to_string();
-        let now = OffsetDateTime::now_utc();
-        let exp = now + time::Duration::seconds(self.ttl_seconds);
+//     pub fn generate_access_token(&self, user: &UserWithRole) -> AppResult<(String, String)> {
+//         let token_id = Uuid::now_v7().to_string();
+//         let now = OffsetDateTime::now_utc();
+//         let exp = now + time::Duration::seconds(self.ttl_seconds);
 
-        let claims = AccessTokenClaims {
-            sub: user.id.to_string(),
-            jti: token_id.to_string(),
-            exp: exp.unix_timestamp(),
-            iat: now.unix_timestamp(),
-            roles: user.roles.clone().unwrap_or_default(),
-            version: 4
-        };
+//         let claims = AccessTokenClaims {
+//             sub: user.id.to_string(),
+//             jti: token_id.to_string(),
+//             exp: exp.unix_timestamp(),
+//             iat: now.unix_timestamp(),
+//             roles: user.roles.clone().unwrap_or_default(),
+//             version: 4
+//         };
 
-        let payload = serde_json::to_vec(&claims)
-            .map_err(|e| AppError::Internal(anyhow::anyhow!(format!("Serialization failed on generating access token: {}", e))))?;
+//         let payload = serde_json::to_vec(&claims)
+//             .map_err(|e| AppError::Internal(anyhow::anyhow!(format!("Serialization failed on generating access token: {}", e))))?;
 
-        let token = encrypt(&self.symmetric_key, &claims, None, None)
-            .map_err(|e| AppError::Internal(anyhow::anyhow!(format!("Paseto encryption failed on generating access token: {}", e)))?;
+//         let token = encrypt(&self.symmetric_key, &claims, None, None)
+//             .map_err(|e| AppError::Internal(anyhow::anyhow!(format!("Paseto encryption failed on generating access token: {}", e)))?;
 
-        Ok((token, token_id))
-    }
-}
+//         Ok((token, token_id))
+//     }
+// }

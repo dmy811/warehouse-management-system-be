@@ -1,8 +1,7 @@
-use std::collections::HashSet;
-
-use std::env;
-
 use anyhow::{Context, Result};
+use std::time::Duration;
+
+// --- App ----------------------------------
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -15,7 +14,7 @@ pub struct Config {
     pub rate_limit: RateLimitConfig,
     pub security: SecurityConfig,
     pub metrics: MetricsConfig,
-    pub cloudinary: CloudinaryConfig
+    pub cloudinary: CloudinaryConfig,
 }
 
 impl Config {
@@ -31,22 +30,22 @@ impl Config {
             security: SecurityConfig::from_env()?,
             metrics: MetricsConfig::from_env()?,
             cloudinary: CloudinaryConfig::from_env()?,
-    
         })
     }
 
     pub fn is_production(&self) -> bool {
-        self.app_env == AppEnv::Production
+        self.app.env == AppEnv::Production
     }
 }
 
+// --- AppConfig ----------------------------------
 
 #[derive(Debug, Clone)]
 pub struct AppConfig {
-    pub env: AppEnvironment,
+    pub env: AppEnv,
     pub host: String,
     pub port: u16,
-    pub workers: usize
+    pub workers: usize,
 }
 
 impl AppConfig {
@@ -71,7 +70,7 @@ impl AppConfig {
         })
     }
 
-    pub fn socker_addr(&self) -> String {
+    pub fn socket_addr(&self) -> String {
         format!("{}:{}", self.host, self.port)
     }
 }
@@ -82,13 +81,15 @@ pub enum AppEnv {
     Production,
 }
 
+// --- DatabaseConfig ----------------------------------
+
 #[derive(Debug, Clone)]
 pub struct DatabaseConfig {
     pub url: String,
     pub pool_size: u32,
     pub timeout: Duration,
 }
- 
+
 impl DatabaseConfig {
     fn from_env() -> Result<Self> {
         Ok(Self {
@@ -107,6 +108,8 @@ impl DatabaseConfig {
     }
 }
 
+// --- RedisConfig ----------------------------------
+
 #[derive(Debug, Clone)]
 pub struct RedisConfig {
     /// Comma-separated Redis URLs. Single URL for standalone, multiple for cluster.
@@ -116,7 +119,7 @@ pub struct RedisConfig {
     pub timeout: Duration,
     pub use_cache: bool,
 }
- 
+
 impl RedisConfig {
     fn from_env() -> Result<Self> {
         let raw = std::env::var("REDIS_URLS").unwrap_or_default();
@@ -125,7 +128,7 @@ impl RedisConfig {
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty())
             .collect();
- 
+
         Ok(Self {
             urls,
             cluster_mode: std::env::var("REDIS_CLUSTER_MODE")
@@ -149,7 +152,9 @@ impl RedisConfig {
         })
     }
 }
- 
+
+// --- AuthConfig ----------------------------------
+
 #[derive(Debug, Clone)]
 pub struct AuthConfig {
     /// PASETO v4 local symmetric key — must be exactly 32 bytes, base64-encoded
@@ -165,7 +170,7 @@ pub struct AuthConfig {
     /// Lockout duration in minutes
     pub failed_login_lockout_minutes: u64,
 }
- 
+
 impl AuthConfig {
     fn from_env() -> Result<Self> {
         Ok(Self {
@@ -191,15 +196,17 @@ impl AuthConfig {
                 .context("FAILED_LOGIN_LOCKOUT_MINUTES must be a number")?,
         })
     }
- 
+
     pub fn refresh_token_ttl_seconds(&self) -> u64 {
         self.refresh_token_ttl_days * 24 * 60 * 60
     }
- 
+
     pub fn lockout_seconds(&self) -> u64 {
         self.failed_login_lockout_minutes * 60
     }
 }
+
+// --- CookieConfig ----------------------------------
 
 #[derive(Debug, Clone)]
 pub struct CookieConfig {
@@ -211,7 +218,7 @@ pub struct CookieConfig {
     pub path: String,
     pub max_age_seconds: i64,
 }
- 
+
 impl CookieConfig {
     fn from_env() -> Result<Self> {
         Ok(Self {
@@ -246,6 +253,36 @@ impl CookieConfig {
     }
 }
 
+// --- CorsConfig ----------------------------------
+
+#[derive(Debug, Clone)]
+pub struct CorsConfig {
+    /// Comma-separated list of allowed origins
+    pub allowed_origins: Vec<String>,
+    pub allow_credentials: bool,
+}
+
+impl CorsConfig {
+    fn from_env() -> Result<Self> {
+        let raw = std::env::var("CORS_ALLOWED_ORIGINS").unwrap_or_default();
+        let origins: Vec<String> = raw
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+
+        Ok(Self {
+            allowed_origins: origins,
+            allow_credentials: std::env::var("CORS_ALLOW_CREDENTIALS")
+                .unwrap_or_else(|_| "false".into())
+                .parse()
+                .unwrap_or(false),
+        })
+    }
+}
+
+// --- RateLimitConfig ----------------------------------
+
 #[derive(Debug, Clone)]
 pub struct RateLimitConfig {
     /// Max requests per window per IP
@@ -255,7 +292,7 @@ pub struct RateLimitConfig {
     /// Burst allowance above the base limit
     pub burst: u32,
 }
- 
+
 impl RateLimitConfig {
     fn from_env() -> Result<Self> {
         Ok(Self {
@@ -275,13 +312,15 @@ impl RateLimitConfig {
     }
 }
 
+// --- SecurityConfig ----------------------------------
+
 #[derive(Debug, Clone)]
 pub struct SecurityConfig {
     pub csp_header: String,
     pub hsts_max_age: u64,
     pub audit_log_enabled: bool,
 }
- 
+
 impl SecurityConfig {
     fn from_env() -> Result<Self> {
         Ok(Self {
@@ -301,39 +340,14 @@ impl SecurityConfig {
     }
 }
 
-
-#[derive(Debug, Clone)]
-pub struct CorsConfig {
-    /// Comma-separated list of allowed origins
-    pub allowed_origins: Vec<String>,
-    pub allow_credentials: bool,
-}
- 
-impl CorsConfig {
-    fn from_env() -> Result<Self> {
-        let raw = std::env::var("CORS_ALLOWED_ORIGINS").unwrap_or_default();
-        let origins: Vec<String> = raw
-            .split(',')
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect();
- 
-        Ok(Self {
-            allowed_origins: origins,
-            allow_credentials: std::env::var("CORS_ALLOW_CREDENTIALS")
-                .unwrap_or_else(|_| "false".into())
-                .parse()
-                .unwrap_or(false),
-        })
-    }
-}
+// --- MetricsConfig ----------------------------------
 
 #[derive(Debug, Clone)]
 pub struct MetricsConfig {
     pub enabled: bool,
     pub path: String,
 }
- 
+
 impl MetricsConfig {
     fn from_env() -> Result<Self> {
         Ok(Self {
@@ -347,22 +361,31 @@ impl MetricsConfig {
     }
 }
 
+// --- CloudinaryConfig ----------------------------------
+
 #[derive(Debug, Clone)]
 pub struct CloudinaryConfig {
     pub cloud_name: String,
     pub api_key: String,
-    pub api_secret: String
+    pub api_secret: String,
 }
 
 impl CloudinaryConfig {
-    pub fn from_env() -> Result<Self> {
+    fn from_env() -> Result<Self> {
         Ok(Self {
-            cloud_name: std::env::var("CLOUDINARY_CLOUD_NAME").context("CLOUDINARY_CLOUD_NAME must be set")?,
-            api_key: std::env::var("CLOUDINARY_API_KEY").context("CLOUDINARY_API_KEY must be set")?,
-            api_secret: std::env::var("CLOUDINARY_API_SECRET").context("CLOUDINARY_API_SECRET must be set")?
+            cloud_name: std::env::var("CLOUDINARY_CLOUD_NAME")
+                .context("CLOUDINARY_CLOUD_NAME must be set")?,
+            api_key: std::env::var("CLOUDINARY_API_KEY")
+                .context("CLOUDINARY_API_KEY must be set")?,
+            api_secret: std::env::var("CLOUDINARY_API_SECRET")
+                .context("CLOUDINARY_API_SECRET must be set")?,
         })
     }
+
     pub fn upload_url(&self) -> String {
-        format!("https://api.cloudinary.com/v1_1/{}/image/upload", self.cloud_name)
+        format!(
+            "https://api.cloudinary.com/v1_1/{}/image/upload",
+            self.cloud_name
+        )
     }
 }
