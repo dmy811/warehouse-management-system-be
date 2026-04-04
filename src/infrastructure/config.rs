@@ -6,150 +6,344 @@ use anyhow::{Context, Result};
 
 #[derive(Debug, Clone)]
 pub struct Config {
-pub app_env: AppEnvironment,
-    pub host: String,
-    pub port: u16,
-    pub rust_log: String,
-    
-    // Database
-    pub database_url: String,
-    pub database_pool_size: u32,
-    pub database_timeout_seconds: u64,
-    
-    // Redis
-    pub redis_urls: Vec<String>,
-    pub redis_cluster_mode: bool,
-    pub redis_pool_size: usize,
-    pub redis_timeout_seconds: u64,
-    pub use_redis_cache: bool,
-    
-    // PASETO for access token
-    pub paseto_symmetric_key: Vec<u8>,
-    
-    // HMAC secret for refresh token hashing
-    pub refresh_token_hmac_secret: Vec<u8>,
-    
-    // Token settings
-    pub access_token_ttl_seconds: i64,
-    pub refresh_token_ttl_days: i64,
-    pub refresh_token_length_bytes: usize,
-    
-    // Cookie
-    pub cookie_name: String,
-    pub cookie_secure: bool,
-    pub cookie_http_only: bool,
-    pub cookie_same_site: SameSite,
-    pub cookie_domain: String,
-    pub cookie_path: String,
-    pub cookie_max_age_seconds: i64,
-    
-    // CORS
-    pub cors_allowed_origins: HashSet<String>,
-    
-    // Rate limiting
-    pub rate_limit_per_ip: u32,
-    pub rate_limit_window_seconds: u64,
-    pub rate_limit_burst: u32,
-    
-    // Security
-    pub csp_header: String,
-    pub hsts_max_age: u64,
-    
-    // Audit
-    pub audit_log_enabled: bool,
-    pub failed_login_threshold: u32,
-    pub failed_login_lockout_minutes: u64,
-    
-    // Metrics
-    pub metrics_enabled: bool,
-    pub metrics_path: String,
+    pub app: AppConfig,
+    pub database: DatabaseConfig,
+    pub redis: RedisConfig,
+    pub auth: AuthConfig,
+    pub cookie: CookieConfig,
+    pub cors: CorsConfig,
+    pub rate_limit: RateLimitConfig,
+    pub security: SecurityConfig,
+    pub metrics: MetricsConfig,
     pub cloudinary: CloudinaryConfig
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum AppEnvironment {
-    Development,
-    Staging,
-    Production,
-}
-
-#[derive(Debug, Clone)]
-pub enum SameSite {
-    Strict,
-    Lax,
-    None,
 }
 
 impl Config {
     pub fn from_env() -> Result<Self> {
         Ok(Self {
-app_env: match env::var("APP_ENV").unwrap_or_else(|_| "development".to_string()).as_str() {
-                "production" => AppEnvironment::Production,
-                "staging" => AppEnvironment::Staging,
-                _ => AppEnvironment::Development,
-            },
-            host: env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string()),
-            port: env::var("PORT").unwrap_or_else(|_| "3000".to_string()).parse()?,
-            rust_log: env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string()),
-            
-            database_url: env::var("DATABASE_URL")?,
-            database_pool_size: env::var("DATABASE_POOL_SIZE").unwrap_or_else(|_| "50".to_string()).parse()?,
-            database_timeout_seconds: env::var("DATABASE_TIMEOUT_SECONDS").unwrap_or_else(|_| "5".to_string()).parse()?,
-            
-            redis_urls: env::var("REDIS_URLS")
-                .unwrap_or_else(|_| "redis://localhost:6379".to_string())
-                .split(',')
-                .map(|s| s.to_string())
-                .collect(),
-            redis_cluster_mode: env::var("REDIS_CLUSTER_MODE").unwrap_or_else(|_| "false".to_string()).parse()?,
-            redis_pool_size: env::var("REDIS_POOL_SIZE").unwrap_or_else(|_| "20".to_string()).parse()?,
-            redis_timeout_seconds: env::var("REDIS_TIMEOUT_SECONDS").unwrap_or_else(|_| "2".to_string()).parse()?,
-            use_redis_cache: env::var("USE_REDIS_CACHE").unwrap_or_else(|_| "true".to_string()).parse()?,
-            
-            paseto_symmetric_key: hex::decode(env::var("PASETO_SYMMETRIC_KEY")?)?,
-            refresh_token_hmac_secret: hex::decode(env::var("REFRESH_TOKEN_HMAC_SECRET")?)?,
-            
-            access_token_ttl_seconds: env::var("ACCESS_TOKEN_TTL_SECONDS").unwrap_or_else(|_| "900".to_string()).parse()?,
-            refresh_token_ttl_days: env::var("REFRESH_TOKEN_TTL_DAYS").unwrap_or_else(|_| "7".to_string()).parse()?,
-            refresh_token_length_bytes: env::var("REFRESH_TOKEN_LENGTH_BYTES").unwrap_or_else(|_| "32".to_string()).parse()?,
-            
-            cookie_name: env::var("COOKIE_NAME").unwrap_or_else(|_| "__Secure_refresh_token".to_string()),
-            cookie_secure: env::var("COOKIE_SECURE").unwrap_or_else(|_| "true".to_string()).parse()?,
-            cookie_http_only: env::var("COOKIE_HTTP_ONLY").unwrap_or_else(|_| "true".to_string()).parse()?,
-            cookie_same_site: match env::var("COOKIE_SAMESITE").unwrap_or_else(|_| "Strict".to_string()).as_str() {
-                "Lax" => SameSite::Lax,
-                "None" => SameSite::None,
-                _ => SameSite::Strict,
-            },
-            cookie_domain: env::var("COOKIE_DOMAIN").unwrap_or_else(|_| "localhost".to_string()),
-            cookie_path: env::var("COOKIE_PATH").unwrap_or_else(|_| "/api/v1/auth/refresh".to_string()),
-            cookie_max_age_seconds: env::var("COOKIE_MAX_AGE_SECONDS").unwrap_or_else(|_| "604800".to_string()).parse()?,
-            
-            cors_allowed_origins: env::var("CORS_ALLOWED_ORIGINS")
-                .unwrap_or_else(|_| "https://app.example.com".to_string())
-                .split(',')
-                .map(|s| s.to_string())
-                .collect(),
-            
-            rate_limit_per_ip: env::var("RATE_LIMIT_PER_IP").unwrap_or_else(|_| "100".to_string()).parse()?,
-            rate_limit_window_seconds: env::var("RATE_LIMIT_WINDOW_SECONDS").unwrap_or_else(|_| "60".to_string()).parse()?,
-            rate_limit_burst: env::var("RATE_LIMIT_BURST").unwrap_or_else(|_| "150".to_string()).parse()?,
-            
-            csp_header: env::var("CSP_HEADER").unwrap_or_else(|_| "default-src 'self'".to_string()),
-            hsts_max_age: env::var("HSTS_MAX_AGE").unwrap_or_else(|_| "31536000".to_string()).parse()?,
-            
-            audit_log_enabled: env::var("AUDIT_LOG_ENABLED").unwrap_or_else(|_| "true".to_string()).parse()?,
-            failed_login_threshold: env::var("FAILED_LOGIN_THRESHOLD").unwrap_or_else(|_| "5".to_string()).parse()?,
-            failed_login_lockout_minutes: env::var("FAILED_LOGIN_LOCKOUT_MINUTES").unwrap_or_else(|_| "15".to_string()).parse()?,
-            
-            metrics_enabled: env::var("METRICS_ENABLED").unwrap_or_else(|_| "true".to_string()).parse()?,
-            metrics_path: env::var("METRICS_PATH").unwrap_or_else(|_| "/metrics".to_string()).parse()?,
-            cloudinary: CloudinaryConfig::from_env()?
+            app: AppConfig::from_env()?,
+            database: DatabaseConfig::from_env()?,
+            redis: RedisConfig::from_env()?,
+            auth: AuthConfig::from_env()?,
+            cookie: CookieConfig::from_env()?,
+            cors: CorsConfig::from_env()?,
+            rate_limit: RateLimitConfig::from_env()?,
+            security: SecurityConfig::from_env()?,
+            metrics: MetricsConfig::from_env()?,
+            cloudinary: CloudinaryConfig::from_env()?,
+    
         })
     }
 
     pub fn is_production(&self) -> bool {
-        self.app_env == AppEnvironment::Production
+        self.app_env == AppEnv::Production
+    }
+}
+
+
+#[derive(Debug, Clone)]
+pub struct AppConfig {
+    pub env: AppEnvironment,
+    pub host: String,
+    pub port: u16,
+    pub workers: usize
+}
+
+impl AppConfig {
+    fn from_env() -> Result<Self> {
+        Ok(Self {
+            env: match std::env::var("APP_ENV")
+                .unwrap_or_else(|_| "development".into())
+                .as_str()
+            {
+                "production" => AppEnv::Production,
+                _ => AppEnv::Development,
+            },
+            host: std::env::var("HOST").unwrap_or_else(|_| "0.0.0.0".into()),
+            port: std::env::var("PORT")
+                .unwrap_or_else(|_| "8080".into())
+                .parse()
+                .context("PORT must be a valid number")?,
+            workers: std::env::var("WORKERS")
+                .unwrap_or_else(|_| "4".into())
+                .parse()
+                .context("WORKERS must be a valid number")?,
+        })
+    }
+
+    pub fn socker_addr(&self) -> String {
+        format!("{}:{}", self.host, self.port)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum AppEnv {
+    Development,
+    Production,
+}
+
+#[derive(Debug, Clone)]
+pub struct DatabaseConfig {
+    pub url: String,
+    pub pool_size: u32,
+    pub timeout: Duration,
+}
+ 
+impl DatabaseConfig {
+    fn from_env() -> Result<Self> {
+        Ok(Self {
+            url: std::env::var("DATABASE_URL").context("DATABASE_URL must be set")?,
+            pool_size: std::env::var("DATABASE_POOL_SIZE")
+                .unwrap_or_else(|_| "10".into())
+                .parse()
+                .context("DATABASE_POOL_SIZE must be a number")?,
+            timeout: Duration::from_secs(
+                std::env::var("DATABASE_TIMEOUT_SECONDS")
+                    .unwrap_or_else(|_| "5".into())
+                    .parse()
+                    .context("DATABASE_TIMEOUT_SECONDS must be a number")?,
+            ),
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct RedisConfig {
+    /// Comma-separated Redis URLs. Single URL for standalone, multiple for cluster.
+    pub urls: Vec<String>,
+    pub cluster_mode: bool,
+    pub pool_size: usize,
+    pub timeout: Duration,
+    pub use_cache: bool,
+}
+ 
+impl RedisConfig {
+    fn from_env() -> Result<Self> {
+        let raw = std::env::var("REDIS_URLS").unwrap_or_default();
+        let urls: Vec<String> = raw
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+ 
+        Ok(Self {
+            urls,
+            cluster_mode: std::env::var("REDIS_CLUSTER_MODE")
+                .unwrap_or_else(|_| "false".into())
+                .parse()
+                .unwrap_or(false),
+            pool_size: std::env::var("REDIS_POOL_SIZE")
+                .unwrap_or_else(|_| "10".into())
+                .parse()
+                .context("REDIS_POOL_SIZE must be a number")?,
+            timeout: Duration::from_secs(
+                std::env::var("REDIS_TIMEOUT_SECONDS")
+                    .unwrap_or_else(|_| "2".into())
+                    .parse()
+                    .context("REDIS_TIMEOUT_SECONDS must be a number")?,
+            ),
+            use_cache: std::env::var("USE_REDIS_CACHE")
+                .unwrap_or_else(|_| "false".into())
+                .parse()
+                .unwrap_or(false),
+        })
+    }
+}
+ 
+#[derive(Debug, Clone)]
+pub struct AuthConfig {
+    /// PASETO v4 local symmetric key — must be exactly 32 bytes, base64-encoded
+    pub paseto_key: String,
+    /// HMAC secret for signing refresh tokens
+    pub refresh_token_hmac_secret: String,
+    /// Refresh token TTL in days
+    pub refresh_token_ttl_days: u64,
+    /// Number of random bytes for refresh token generation
+    pub refresh_token_length_bytes: usize,
+    /// Failed login threshold before lockout
+    pub failed_login_threshold: u32,
+    /// Lockout duration in minutes
+    pub failed_login_lockout_minutes: u64,
+}
+ 
+impl AuthConfig {
+    fn from_env() -> Result<Self> {
+        Ok(Self {
+            paseto_key: std::env::var("PASETO_SYMMETRIC_KEY")
+                .context("PASETO_SYMMETRIC_KEY must be set")?,
+            refresh_token_hmac_secret: std::env::var("REFRESH_TOKEN_HMAC_SECRET")
+                .context("REFRESH_TOKEN_HMAC_SECRET must be set")?,
+            refresh_token_ttl_days: std::env::var("REFRESH_TOKEN_TTL_DAYS")
+                .unwrap_or_else(|_| "7".into())
+                .parse()
+                .context("REFRESH_TOKEN_TTL_DAYS must be a number")?,
+            refresh_token_length_bytes: std::env::var("REFRESH_TOKEN_LENGTH_BYTES")
+                .unwrap_or_else(|_| "32".into())
+                .parse()
+                .context("REFRESH_TOKEN_LENGTH_BYTES must be a number")?,
+            failed_login_threshold: std::env::var("FAILED_LOGIN_THRESHOLD")
+                .unwrap_or_else(|_| "5".into())
+                .parse()
+                .context("FAILED_LOGIN_THRESHOLD must be a number")?,
+            failed_login_lockout_minutes: std::env::var("FAILED_LOGIN_LOCKOUT_MINUTES")
+                .unwrap_or_else(|_| "15".into())
+                .parse()
+                .context("FAILED_LOGIN_LOCKOUT_MINUTES must be a number")?,
+        })
+    }
+ 
+    pub fn refresh_token_ttl_seconds(&self) -> u64 {
+        self.refresh_token_ttl_days * 24 * 60 * 60
+    }
+ 
+    pub fn lockout_seconds(&self) -> u64 {
+        self.failed_login_lockout_minutes * 60
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct CookieConfig {
+    pub name: String,
+    pub secure: bool,
+    pub http_only: bool,
+    pub same_site: String,
+    pub domain: Option<String>,
+    pub path: String,
+    pub max_age_seconds: i64,
+}
+ 
+impl CookieConfig {
+    fn from_env() -> Result<Self> {
+        Ok(Self {
+            name: std::env::var("COOKIE_NAME")
+                .unwrap_or_else(|_| "refresh_token".into())
+                .trim_matches('"')
+                .to_string(),
+            secure: std::env::var("COOKIE_SECURE")
+                .unwrap_or_else(|_| "true".into())
+                .parse()
+                .unwrap_or(true),
+            http_only: std::env::var("COOKIE_HTTP_ONLY")
+                .unwrap_or_else(|_| "true".into())
+                .parse()
+                .unwrap_or(true),
+            same_site: std::env::var("COOKIE_SAME_SITE")
+                .unwrap_or_else(|_| "Strict".into())
+                .trim_matches('"')
+                .to_string(),
+            domain: std::env::var("COOKIE_DOMAIN").ok().map(|d| {
+                d.trim_matches('"').to_string()
+            }),
+            path: std::env::var("COOKIE_PATH")
+                .unwrap_or_else(|_| "/api/v1/auth/refresh".into())
+                .trim_matches('"')
+                .to_string(),
+            max_age_seconds: std::env::var("COOKIE_MAX_AGE_SECONDS")
+                .unwrap_or_else(|_| "604800".into())
+                .parse()
+                .context("COOKIE_MAX_AGE_SECONDS must be a number")?,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct RateLimitConfig {
+    /// Max requests per window per IP
+    pub per_ip: u32,
+    /// Window size in seconds
+    pub window_seconds: u64,
+    /// Burst allowance above the base limit
+    pub burst: u32,
+}
+ 
+impl RateLimitConfig {
+    fn from_env() -> Result<Self> {
+        Ok(Self {
+            per_ip: std::env::var("RATE_LIMIT_PER_IP")
+                .unwrap_or_else(|_| "100".into())
+                .parse()
+                .context("RATE_LIMIT_PER_IP must be a number")?,
+            window_seconds: std::env::var("RATE_LIMIT_WINDOW_SECONDS")
+                .unwrap_or_else(|_| "60".into())
+                .parse()
+                .context("RATE_LIMIT_WINDOW_SECONDS must be a number")?,
+            burst: std::env::var("RATE_LIMIT_BURST")
+                .unwrap_or_else(|_| "150".into())
+                .parse()
+                .context("RATE_LIMIT_BURST must be a number")?,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SecurityConfig {
+    pub csp_header: String,
+    pub hsts_max_age: u64,
+    pub audit_log_enabled: bool,
+}
+ 
+impl SecurityConfig {
+    fn from_env() -> Result<Self> {
+        Ok(Self {
+            csp_header: std::env::var("CSP_HEADER")
+                .unwrap_or_else(|_| "default-src 'self'".into())
+                .trim_matches('"')
+                .to_string(),
+            hsts_max_age: std::env::var("HSTS_MAX_AGE")
+                .unwrap_or_else(|_| "31536000".into())
+                .parse()
+                .context("HSTS_MAX_AGE must be a number")?,
+            audit_log_enabled: std::env::var("AUDIT_LOG_ENABLED")
+                .unwrap_or_else(|_| "false".into())
+                .parse()
+                .unwrap_or(false),
+        })
+    }
+}
+
+
+#[derive(Debug, Clone)]
+pub struct CorsConfig {
+    /// Comma-separated list of allowed origins
+    pub allowed_origins: Vec<String>,
+    pub allow_credentials: bool,
+}
+ 
+impl CorsConfig {
+    fn from_env() -> Result<Self> {
+        let raw = std::env::var("CORS_ALLOWED_ORIGINS").unwrap_or_default();
+        let origins: Vec<String> = raw
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+ 
+        Ok(Self {
+            allowed_origins: origins,
+            allow_credentials: std::env::var("CORS_ALLOW_CREDENTIALS")
+                .unwrap_or_else(|_| "false".into())
+                .parse()
+                .unwrap_or(false),
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct MetricsConfig {
+    pub enabled: bool,
+    pub path: String,
+}
+ 
+impl MetricsConfig {
+    fn from_env() -> Result<Self> {
+        Ok(Self {
+            enabled: std::env::var("METRICS_ENABLED")
+                .unwrap_or_else(|_| "false".into())
+                .parse()
+                .unwrap_or(false),
+            path: std::env::var("METRICS_PATH")
+                .unwrap_or_else(|_| "/metrics".into()),
+        })
     }
 }
 
