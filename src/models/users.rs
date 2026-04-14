@@ -39,14 +39,6 @@ pub struct UserWithRole {
     pub updated_at: DateTime<Utc>
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TokenClaims {
-    pub sub: String,
-    pub roles: Vec<String>,
-    pub exp: i64,
-    pub iat: i64,
-}
-
 #[derive(Debug, Clone, FromRow)]
 pub struct RefreshToken {
     pub id: i64,
