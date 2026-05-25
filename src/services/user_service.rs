@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tracing::info;
 
-use crate::{dtos::{UserResponse, user_dto::{CreateUserRequest, UpdateUserRequest}}, errors::{AppError, AppResult}, repositories::user_repository::UserRepositoryTrait, response::{ListQuery, PaginatedResponse}, utils::crypto::hash_password};
+use crate::{dtos::{UserResponse, user_dto::{AddRoleRequest, CreateUserRequest, UpdateUserRequest}}, errors::{AppError, AppResult}, repositories::user_repository::UserRepositoryTrait, response::{ListQuery, PaginatedResponse}, utils::crypto::hash_password};
 
 #[async_trait]
 pub trait UserServiceTrait: Send + Sync {
@@ -13,6 +13,7 @@ pub trait UserServiceTrait: Send + Sync {
     async fn update_user(&self, user_id: i64, req: UpdateUserRequest) -> AppResult<UserResponse>;
     async fn user_soft_delete(&self, user_id: i64) -> AppResult<()>;
     async fn user_hard_delete(&self, user_id: i64) -> AppResult<()>;
+    async fn add_role(&self, req: AddRoleRequest) -> AppResult<()>;
 }
 
 pub struct UserService<R: UserRepositoryTrait> {
@@ -125,6 +126,19 @@ impl<R: UserRepositoryTrait> UserServiceTrait for UserService<R>  {
 
 
         info!(user_id = user_id, "User hard deleted");
+
+        Ok(())
+    }
+
+    async fn add_role(&self, req: AddRoleRequest) -> AppResult<()>{
+        self.repo
+            .find_user_by_id(req.user_id)
+            .await?
+            .ok_or_else(|| AppError::NotFound(format!("User with id {}", user_id)))?;
+
+        self.repo
+            .add_role(req.user_id, &req.role)
+            .await?;
 
         Ok(())
     }

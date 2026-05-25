@@ -1,9 +1,13 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use deadpool_redis::Pool as RedisPool;
 use tracing::{info, warn};
 
-use crate::{dtos::{AuthResponse, LoginRequest, UserResponse, auth_dto::UpdatePasswordRequest, user_dto::UpdateUserRequest}, errors::{AppError, AppResult}, infrastructure::config::Config, repositories::AuthRepositoryTrait, utils::{crypto::{hash_password, verify_password}}};
+
+use crate::{dtos::{AuthResponse, LoginRequest, UserResponse, auth_dto::UpdatePasswordRequest, user_dto::UpdateUserRequest}, errors::{AppError, AppResult}, infrastructure::{config::Config, redis::{self, keys}}, repositories::AuthRepositoryTrait, utils::{crypto::{hash_password, verify_password}}};
+
+const ACCESS_TOKEN_TTL_SECS: i64 = 15 * 60; // 15 minutes
 
 #[async_trait]
 pub trait AuthServiceTrait: Send + Sync {
@@ -17,14 +21,16 @@ pub trait AuthServiceTrait: Send + Sync {
 
 pub struct AuthService<R: AuthRepositoryTrait> {
     repo: Arc<R>,
-    config: Arc<Config>
+    config: Arc<Config>,
+    redis: Arc<RedisPool>
 }
 
 impl<R: AuthRepositoryTrait> AuthService<R> {
-    pub fn new(repo: Arc<R>, config: Arc<Config>) -> Self {
+    pub fn new(repo: Arc<R>, config: Arc<Config>, redis: Arc<RedisPool>) -> Self {
         Self {
             repo,
-            config
+            config,
+            redis
         }
     }
 }

@@ -54,3 +54,10 @@ impl UpdateUserRequest {
 pub struct DeleteUserQuery {
     pub mode: Option<String>
 }
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct AddRoleRequest {
+    pub user_id: i64,
+    #[validate(custom(function = "validate_role"))]
+    pub role: String
+}

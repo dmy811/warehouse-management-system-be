@@ -1,10 +1,8 @@
-use std::collections::HashMap;
-
 use axum::{Extension, Json, extract::{Path, Query, State}, response::IntoResponse};
 use serde_json::Value;
 use validator::Validate;
 
-use crate::{constants::permissions, dtos::{UserResponse, user_dto::{CreateUserRequest, DeleteUserQuery, UpdateUserRequest}}, errors::{AppError, AppResult}, middlewares::{AuthUser, require_roles}, response::{ApiResponse, ListQuery, PaginatedResponse}, state::AppState};
+use crate::{constants::permissions, dtos::{UserResponse, user_dto::{AddRoleRequest, CreateUserRequest, DeleteUserQuery, UpdateUserRequest}}, errors::{AppError, AppResult}, middlewares::{AuthUser, require_roles}, response::{ApiResponse, ListQuery, PaginatedResponse}, state::AppState};
 
 pub async fn create_user(
     State(state): State<AppState>,
@@ -81,4 +79,16 @@ pub async fn delete_user(
     
 
     Ok(ApiResponse::ok(message, Value::Null))
+}
+
+pub async fn add_role(
+    State(state): State<AppState>,
+    Extension(auth_user): Extension<AuthUser>,
+    Json(req): Json<AddRoleRequest>
+) -> AppResult<impl IntoResponse> {
+    require_roles(permissions::CAN_MANAGE_USERS)(auth_user.clone())?;
+
+    state.services.user.add_role(req).await?;
+
+    Ok(ApiResponse::ok("Adding role successful", Value::Null))
 }

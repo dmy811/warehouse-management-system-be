@@ -11,6 +11,7 @@ pub trait UserRepositoryTrait: Send + Sync {
     async fn update_user(&self, user_id: i64, name: Option<&str>, email: Option<&str>, phone: Option<&str>) -> AppResult<Option<User>>;
     async fn user_soft_delete(&self, user_id: i64) -> AppResult<bool>;
     async fn user_hard_delete(&self, user_id: i64) -> AppResult<bool>;
+    async fn add_role(&self, user_id: i64, role: &str) -> AppResult<bool>;
 }
 
 
@@ -229,6 +230,34 @@ impl UserRepositoryTrait for UserRepository {
             DELETE FROM users WHERE id = $1
             "#,
             user_id
+        )
+        .execute(&self.db)
+        .await?;
+
+        Ok(result.rows_affected() > 0)
+    }
+
+    async fn add_role(&self, user_id: i64, role: &str) -> AppResult<bool> {
+        let role_id: i64 = sqlx::query_scalar!(
+            r#"
+            SELECT id
+            FROM public.roles
+            WHERE name = $1
+            "#,
+            role
+        )
+        .fetch_optional(&self.db)
+        .await?
+        .ok_or(AppError::NotFound(format!("Role name {}", role)))?;
+
+        let result = sqlx::query!(
+            r#"
+            INSERT INTO public.user_roles (user_id, role_id)
+            VALUES ($1, $2)
+            ON CONFLICT (user_id, role_id) DO NOTHING;
+            "#,
+            user_id,
+            role_id
         )
         .execute(&self.db)
         .await?;
