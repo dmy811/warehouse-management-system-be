@@ -63,7 +63,7 @@ impl<R: WarehouseRepositoryTrait> WarehouseServiceTrait for WarehouseService<R> 
 
         let warehouse = self
             .repo
-            .create_warehouse(&req.name, &req.address, req.phone.as_deref(), req.photo.as_deref())
+            .create_warehouse(&req.name, &req.address, req.phone.as_deref(), req.photo.as_deref()) // as_deref() convert Option<String> → Option<&str>
             .await?;
 
         info!(

@@ -23,6 +23,43 @@ pub trait WarehouseRepositoryTrait: Send + Sync {
     async fn check_user_existing(&self, user_id: i64) -> AppResult<bool>;
 }
 
+// Kenapa di function parameter &str bisa tanpa 'a?
+/* misal kode ini 
+async fn create(
+    &self,
+    name: &str,
+    email: &str,
+) -> AppResult<User>;
+
+Yang sebenarnya compiler baca:
+
+async fn create<'a, 'b, 'c>(
+    &'a self,
+    name: &'b str,
+    email: &'c str,
+) -> AppResult<User>;
+
+Rust punya aturan bernama Lifetime Elision — compiler otomatis menyimpulkan lifetime yang obvious tanpa ditulis eksplisit.
+
+Compiler assign lifetime berbeda ke setiap parameter secara otomatis. Ini aman karena:
+Output function tidak mengandung referensi ke parameter manapun. Return type-nya AppResult<User> — User adalah owned struct, bukan referensi. Jadi compiler tidak perlu tahu mana lifetime yang harus di-carry ke return value.
+
+Kapan lifetime elision TIDAK bisa bekerja
+Lifetime elision gagal ketika return type mengandung referensi dan compiler tidak bisa tahu referensi itu dari mana asalnya:
+
+function parameter mekanismenya begitu, berbeda jika parameternya pakai struct
+Function parameter → lifetime-nya PASTI berakhir saat function return
+                     compiler sudah tahu ini, tidak perlu diberitahu
+
+Struct field       → struct bisa hidup seberapa lama saja
+                     compiler tidak tahu kapan struct di-drop
+                     harus diberitahu eksplisit lewat 'a
+
+kenapa di repository pakai &str bukan String adalah karena Di dalam function create, itu hanya membaca name untuk dimasukkan ke SQL query. Tidak perlu memilikinya. Meminjam (&str) sudah cukup dan jauh lebih efisien.
+kalai pakai String ada alokasi memory baru harus gunakan req.name.clone()  // clone = alokasi baru di heap
+Dengan &str — tidak ada alokasi  &req.name  // hanya pinjam, tidak ada alokasi
+*/
+
 pub struct WarehouseRepository {
     db: PgPool
 }

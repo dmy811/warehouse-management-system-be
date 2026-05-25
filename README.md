@@ -18,19 +18,19 @@ There are 4 roles: **ADMIN**, **MANAGER**, **STAFF**, and **VIEWER**.
 
 ## Access Matrix
 
-| Module              | ADMIN                               | MANAGER                       | STAFF                | VIEWER    |
-| ------------------- | ----------------------------------- | ----------------------------- | -------------------- | --------- |
-| User Management     | Full CRUD + assign role & warehouse | Read only                     | ❌                   | ❌        |
-| Warehouse           | Full CRUD                           | Read only                     | Read only            | Read only |
-| Product & Category  | Full CRUD                           | Create, read, update          | Read only            | Read only |
-| Supplier & Customer | Full CRUD                           | Create, read, update          | Read only            | Read only |
-| Rack                | Full CRUD                           | Create, read, update          | Read only            | Read only |
-| Goods Receipt       | Full CRUD + approve                 | Create, read, update, approve | Create (DRAFT), read | Read only |
-| Shipment            | Full CRUD + approve                 | Create, read, update, approve | Create (DRAFT), read | Read only |
-| Transfer            | Full CRUD + approve                 | Create, read, update, approve | Create (DRAFT), read | Read only |
-| Inventory           | Read + manual adjustment            | Read + manual adjustment      | Read only            | Read only |
-| Stock Movement      | Read only                           | Read only                     | Read only            | Read only |
-| Report              | Full access                         | Full access                   | Own warehouse only   | Read only |
+| Module              | ADMIN                               | MANAGER                  | STAFF                | VIEWER    |
+| ------------------- | ----------------------------------- | ------------------------ | -------------------- | --------- |
+| User Management     | Full CRUD + assign role & warehouse | Read only                | ❌                   | ❌        |
+| Warehouse           | Full CRUD                           | Read only                | Read only            | Read only |
+| Product & Category  | Full CRUD                           | CRU                      | Read only            | Read only |
+| Supplier & Customer | Full CRUD                           | CRU                      | Read only            | Read only |
+| Rack                | Full CRUD                           | CRU                      | Read only            | Read only |
+| Goods Receipt       | Full CRUD + approve                 | CRU, approve             | Create (DRAFT), read | Read only |
+| Shipment            | Full CRUD + approve                 | CRU, approve             | Create (DRAFT), read | Read only |
+| Transfer            | Full CRUD + approve                 | CRU, approve             | Create (DRAFT), read | Read only |
+| Inventory           | Read + manual adjustment            | Read + manual adjustment | Read only            | Read only |
+| Stock Movement      | Read only                           | Read only                | Read only            | Read only |
+| Report              | Full access                         | Full access              | Own warehouse only   | Read only |
 
 ---
 

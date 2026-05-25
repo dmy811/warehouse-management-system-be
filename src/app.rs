@@ -7,7 +7,7 @@ use crate::{infrastructure::{config::Config, db::create_pool}, middlewares::{aut
 use crate::constants::file_upload::MAX_FILE_SIZE;
 
 pub async fn build(config: Config) -> Result<Router> {
-    let pool = create_pool(&config.database_url).await?;
+    let pool = create_pool(&config.database.url).await?;
     Ok(build_with_pool(pool, config).await)
 }
 

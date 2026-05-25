@@ -13,8 +13,8 @@ use crate::{errors::AppError};
 pub struct TokenClaims {
     pub sub: String,
     pub roles: Vec<String>,
-    pub exp: i64,
     pub iat: i64,
+    pub exp: i64,
 }
 
 pub fn create_access_token(
@@ -179,3 +179,124 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
     a.iter().zip(b.iter()).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
+ 
+    fn test_key() -> String {
+        // 32 random bytes encoded as base64
+        BASE64.encode([0u8; 32])
+    }
+
+    fn test_roles_single() -> Vec<String> {
+        vec!["ADMIN".to_string()]
+    }
+
+    fn test_roles_multiple() -> Vec<String> {
+        vec!["ADMIN".to_string(), "MANAGER".to_string()]
+    }
+ 
+    fn test_hmac_secret() -> &'static str {
+        "test_hmac_secret_long_enough_32ch"
+    }
+ 
+    // ── Access token tests ────────────────────────────────────────────────────
+ 
+    #[test]
+    fn test_create_and_verify_single_role() {
+        let token = create_access_token(42, &test_roles_single(), &test_key(), 3600).unwrap();
+        let claims = verify_access_token(&token, &test_key()).unwrap();
+
+        assert_eq!(claims.sub, "42");
+        assert_eq!(claims.roles, vec!["ADMIN"]);
+    }
+
+
+    #[test]
+    fn test_create_and_verify_multiple_roles() {
+        let token = create_access_token(1, &test_roles_multiple(), &test_key(), 3600).unwrap();
+        let claims = verify_access_token(&token, &test_key()).unwrap();
+
+        assert_eq!(claims.roles.len(), 2);
+        assert!(claims.roles.contains(&"ADMIN".to_string()));
+        assert!(claims.roles.contains(&"MANAGER".to_string()));
+    }
+ 
+    #[test]
+    fn test_access_token_is_not_jwt() {
+        // PASETO tokens start with "v4.local." not "eyJ"
+        let token = create_access_token(1, &test_roles_single(), &test_key(), 3600).unwrap();
+        assert!(token.starts_with("v4.local."));
+        assert!(!token.starts_with("eyJ"));
+    }
+ 
+    #[test]
+    fn test_expired_access_token_is_rejected() {
+        let token = create_access_token(1, &test_roles_single(), &test_key(), -1).unwrap();
+        let result = verify_access_token(&token, &test_key());
+        assert!(matches!(result, Err(AppError::InvalidToken)));
+    }
+ 
+    #[test]
+    fn test_wrong_key_rejects_token() {
+        let token = create_access_token(1, &test_roles_single(), &test_key(), 3600).unwrap();
+        let wrong_key = BASE64.encode([1u8; 32]);
+        let result = verify_access_token(&token, &wrong_key);
+        assert!(matches!(result, Err(AppError::InvalidToken)));
+    }
+ 
+    #[test]
+    fn test_tampered_token_is_rejected() {
+        let token = create_access_token(1, &test_roles_single(), &test_key(), 3600).unwrap();
+        let tampered = format!("{}X", token);
+        let result = verify_access_token(&tampered, &test_key());
+        assert!(matches!(result, Err(AppError::InvalidToken)));
+    }
+ 
+    // ── Refresh token tests ───────────────────────────────────────────────────
+ 
+    #[test]
+    fn test_generate_and_verify_refresh_token() {
+        let rt = generate_refresh_token(test_hmac_secret(), 32).unwrap();
+        let raw = verify_refresh_token(&rt.token, test_hmac_secret()).unwrap();
+        assert_eq!(raw, rt.raw_bytes);
+    }
+ 
+    #[test]
+    fn test_two_refresh_tokens_are_different() {
+        let rt1 = generate_refresh_token(test_hmac_secret(), 32).unwrap();
+        let rt2 = generate_refresh_token(test_hmac_secret(), 32).unwrap();
+        assert_ne!(rt1.token, rt2.token);
+    }
+ 
+    #[test]
+    fn test_tampered_refresh_token_is_rejected() {
+        let rt = generate_refresh_token(test_hmac_secret(), 32).unwrap();
+        let tampered = format!("{}X", rt.token);
+        let result = verify_refresh_token(&tampered, test_hmac_secret());
+        assert!(matches!(result, Err(AppError::InvalidToken)));
+    }
+ 
+    #[test]
+    fn test_wrong_secret_rejects_refresh_token() {
+        let rt = generate_refresh_token(test_hmac_secret(), 32).unwrap();
+        let result = verify_refresh_token(&rt.token, "wrong_secret");
+        assert!(matches!(result, Err(AppError::InvalidToken)));
+    }
+ 
+    #[test]
+    fn test_hash_refresh_token_is_deterministic() {
+        let raw = vec![1u8, 2, 3, 4];
+        let hash1 = hash_refresh_token(&raw);
+        let hash2 = hash_refresh_token(&raw);
+        assert_eq!(hash1, hash2);
+    }
+ 
+    #[test]
+    fn test_hash_refresh_token_different_inputs_differ() {
+        let hash1 = hash_refresh_token(&[1u8; 32]);
+        let hash2 = hash_refresh_token(&[2u8; 32]);
+        assert_ne!(hash1, hash2);
+    }
+}                                                                                                                                           
