@@ -1,6 +1,6 @@
-use axum::{extract::{State}, http::{header, Request}, middleware::Next, response::Response};
+use axum::{body::Body, extract::State, http::{Request, header}, middleware::Next, response::Response};
 
-use crate::{errors::AppError, state::AppState, utils::jwt::verify_token};
+use crate::{errors::AppError, state::AppState, utils::paseto::{create_access_token, verify_access_token}};
 
 #[derive(Debug, Clone)]
 pub struct AuthUser {
@@ -10,26 +10,26 @@ pub struct AuthUser {
 
 pub async fn auth_middleware(
     State(state): State<AppState>,
-    mut req: Request<axum::body::Body>,
+    mut req: Request<Body>,
     next: Next
 ) -> Result<Response, AppError> {
     let token = extract_bearer_token(&req)?;
-    let claims = verify_token(token, &state.config.jwt_secret)?;
+    let claims = verify_access_token(token, &state.config.auth.paseto_key)?;
 
     let user_id: i64 = claims
         .sub
         .parse()
         .map_err(|_| AppError::InvalidToken)?;
-    
-    req.extensions_mut().insert(AuthUser {
+
+    req.extensions_mut().insert(AuthUser{
         id: user_id,
         roles: claims.roles
     });
-    
+
     Ok(next.run(req).await)
 }
 
-fn extract_bearer_token(req: &Request<axum::body::Body>) -> Result<&str, AppError>{
+fn extract_bearer_token(req: &Request<Body>) -> Result<&str, AppError>{
     let header_value = req
         .headers()
         .get(header::AUTHORIZATION)
@@ -131,3 +131,25 @@ let result: Vec<i32> = numbers.iter()
 
 // hasil: [20, 40, 60, 80, 100]
 */
+
+// if uses jwt:
+// pub async fn auth_middleware(
+//     State(state): State<AppState>,
+//     mut req: Request<Body>,
+//     next: Next
+// ) -> Result<Response, AppError> {
+//     let token = extract_bearer_token(&req)?;
+//     let claims = verify_token(token, &state.config.jwt_secret)?;
+
+//     let user_id: i64 = claims
+//         .sub
+//         .parse()
+//         .map_err(|_| AppError::InvalidToken)?;
+    
+//     req.extensions_mut().insert(AuthUser {
+//         id: user_id,
+//         roles: claims.roles
+//     });
+    
+//     Ok(next.run(req).await)
+// }

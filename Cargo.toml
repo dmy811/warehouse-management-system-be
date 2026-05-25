@@ -16,7 +16,7 @@ sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "uuid"
 deadpool-postgres = { version = "0.13", features = ["serde"] }
 
 # Redis (cache)
-redis = { version = "0.27", features = ["tokio-comp", "connection-manager", "cluster-async"]}
+# redis = { version = "0.27", features = ["tokio-comp", "connection-manager", "cluster-async"]} pakai redis dari deadpool-redis untuk menghindari tabrakan crate
 deadpool-redis ={ version = "0.16", features = ["serde"]}
  
 # Auth / Security

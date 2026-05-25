@@ -12,7 +12,7 @@
 //     pub exp: i64
 // }
 
-// pub fn create_token(
+// pub fn create_access_token(
 //     user_id: i64,
 //     roles: &[String],
 //     secret: &str,
@@ -35,7 +35,7 @@
 //     ).map_err(|_| AppError::Internal(anyhow::anyhow!("Failed to create token")))
 // }
 
-// pub fn verify_token(token: &str, secret: &str) -> Result<Claims, AppError> {
+// pub fn verify_access_token(token: &str, secret: &str) -> Result<Claims, AppError> {
 //     decode::<Claims>(
 //         token,
 //         &DecodingKey::from_secret(secret.as_bytes()),

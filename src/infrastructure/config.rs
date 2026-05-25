@@ -113,8 +113,7 @@ impl DatabaseConfig {
 #[derive(Debug, Clone)]
 pub struct RedisConfig {
     /// Comma-separated Redis URLs. Single URL for standalone, multiple for cluster.
-    pub urls: Vec<String>,
-    pub cluster_mode: bool,
+    pub url: String,
     pub pool_size: usize,
     pub timeout: Duration,
     pub use_cache: bool,
@@ -122,19 +121,8 @@ pub struct RedisConfig {
 
 impl RedisConfig {
     fn from_env() -> Result<Self> {
-        let raw = std::env::var("REDIS_URLS").unwrap_or_default();
-        let urls: Vec<String> = raw
-            .split(',')
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect();
-
         Ok(Self {
-            urls,
-            cluster_mode: std::env::var("REDIS_CLUSTER_MODE")
-                .unwrap_or_else(|_| "false".into())
-                .parse()
-                .unwrap_or(false),
+            url: std::env::var("REDIS_URL").unwrap_or_default(),
             pool_size: std::env::var("REDIS_POOL_SIZE")
                 .unwrap_or_else(|_| "10".into())
                 .parse()
