@@ -37,6 +37,12 @@ impl<R: AuthRepositoryTrait> AuthService<R> {
 
 #[async_trait]
 impl<R: AuthRepositoryTrait> AuthServiceTrait for AuthService<R> {
+    async fn issue_tokens(
+        &self,
+        user_id: i64,
+        role: &str,
+        
+    )
     async fn login(&self, req: LoginRequest) -> AppResult<AuthResponse>{
         let user = self
             .repo

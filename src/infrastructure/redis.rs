@@ -1,8 +1,14 @@
-use deadpool_redis::{redis::{AsyncCommands, cmd}, Config as DeadpoolConfig, Pool, Runtime};
+use deadpool_redis::{redis::{AsyncCommands, cmd}, Config as DeadpoolConfig, Pool, Runtime, Connection};
 use tracing::info;
 
 use crate::{errors::AppError, infrastructure::config::RedisConfig};
 
+
+async fn get_conn(pool: &Pool) -> Result<Connection, AppError> {
+    pool.get()
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Redis connection failed: {}", e)))
+}
 
 pub async fn create_pool(redis_config: &RedisConfig) -> Result<Pool, AppError> {
     if redis_config.url.is_empty() {
@@ -44,10 +50,7 @@ pub async fn set_ex(
     value: &str,
     ttl_secs: u64
 ) -> Result<(), AppError> {
-    let mut conn = pool
-        .get()
-        .await
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Redis get conn: {}", e)))?;
+    let mut conn = get_conn(pool).await?;
 
     conn.set_ex::<_, _, ()>(key, value, ttl_secs)
         .await
@@ -55,10 +58,7 @@ pub async fn set_ex(
 }
 
 pub async fn get(pool: &Pool, key: &str) -> Result<Option<String>, AppError> {
-    let mut conn = pool
-        .get()
-        .await
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Redis get conn: {}", e)))?;
+    let mut conn = get_conn(pool).await?;
  
     conn.get::<_, Option<String>>(key)
         .await
@@ -66,10 +66,7 @@ pub async fn get(pool: &Pool, key: &str) -> Result<Option<String>, AppError> {
 }
 
 pub async fn del(pool: &Pool, key: &str) -> Result<bool, AppError> {
-    let mut conn = pool
-        .get()
-        .await
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Redis get conn: {}", e)))?;
+    let mut conn = get_conn(pool).await?;
  
     let deleted: i64 = conn
         .del(key)
@@ -81,10 +78,7 @@ pub async fn del(pool: &Pool, key: &str) -> Result<bool, AppError> {
 
 /// Increment a counter. Returns the new value.
 pub async fn incr(pool: &Pool, key: &str) -> Result<i64, AppError> {
-    let mut conn = pool
-        .get()
-        .await
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Redis get conn: {}", e)))?;
+    let mut conn = get_conn(pool).await?;
  
     conn.incr::<_, _, i64>(key, 1)
         .await
@@ -93,10 +87,7 @@ pub async fn incr(pool: &Pool, key: &str) -> Result<i64, AppError> {
  
 /// Set TTL on an existing key. Used to set expiry after INCR.
 pub async fn expire(pool: &Pool, key: &str, ttl_secs: u64) -> Result<(), AppError> {
-    let mut conn = pool
-        .get()
-        .await
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Redis get conn: {}", e)))?;
+    let mut conn = get_conn(pool).await?;
  
     conn.expire::<_, ()>(key, ttl_secs as i64)
         .await
@@ -104,10 +95,7 @@ pub async fn expire(pool: &Pool, key: &str, ttl_secs: u64) -> Result<(), AppErro
 }
 
 pub async fn exists(pool: &Pool, key: &str) -> Result<bool, AppError> {
-    let mut conn = pool
-        .get()
-        .await
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Redis get conn: {}", e)))?;
+    let mut conn = get_conn(pool).await?;
  
     let result: bool = conn
         .exists(key)

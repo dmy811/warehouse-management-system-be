@@ -134,7 +134,7 @@ impl<R: UserRepositoryTrait> UserServiceTrait for UserService<R>  {
         self.repo
             .find_user_by_id(req.user_id)
             .await?
-            .ok_or_else(|| AppError::NotFound(format!("User with id {}", user_id)))?;
+            .ok_or_else(|| AppError::NotFound(format!("User with id {}", req.user_id)))?;
 
         self.repo
             .add_role(req.user_id, &req.role)
