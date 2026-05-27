@@ -5,7 +5,7 @@ use deadpool_redis::Pool as RedisPool;
 use tracing::{info, warn};
 
 
-use crate::{dtos::{AuthResponse, LoginRequest, UserResponse, auth_dto::UpdatePasswordRequest, user_dto::UpdateUserRequest}, errors::{AppError, AppResult}, infrastructure::{config::Config, redis::{self, keys}}, repositories::AuthRepositoryTrait, utils::{crypto::{hash_password, verify_password}}};
+use crate::{dtos::{AuthResponse, LoginRequest, UserResponse, auth_dto::UpdatePasswordRequest, user_dto::UpdateUserRequest}, errors::{AppError, AppResult}, infrastructure::{config::Config, redis::{self, keys}}, repositories::AuthRepositoryTrait, utils::{crypto::{verify_password}, paseto::{create_access_token, generate_refresh_token, hash_refresh_token}}};
 
 const ACCESS_TOKEN_TTL_SECS: i64 = 15 * 60; // 15 minutes
 
@@ -33,22 +33,45 @@ impl<R: AuthRepositoryTrait> AuthService<R> {
             redis
         }
     }
+
+    async fn record_failed_attempt(&self, email: &str) -> AppResult<()>{
+        let failed_key = keys::failed_login(email);
+        let count = redis::incr(&self.redis, &failed_key).await?;
+
+        if count == 1 {
+            redis::expire(&self.redis, &failed_key, self.config.auth.lockout_seconds() * 2).await?; // counter lives 2x lockout period
+        }
+
+        if count >= self.config.auth.failed_login_threshold as i64 {
+            let lockout_key = keys::lockout(email);
+            redis::set_ex(&self.redis, &lockout_key, "1", self.config.auth.lockout_seconds()).await?;
+
+            warn!(
+                email = %email,
+                count = count,
+                lockout_minutes = self.config.auth.failed_login_lockout_minutes,
+                "Account locked duo to repeated failed login attempts"
+            )
+        }
+
+        Ok(())
+    }
 }
 
 #[async_trait]
 impl<R: AuthRepositoryTrait> AuthServiceTrait for AuthService<R> {
-    async fn issue_tokens(
-        &self,
-        user_id: i64,
-        role: &str,
-        
-    )
     async fn login(&self, req: LoginRequest) -> AppResult<AuthResponse>{
+        let lockout_key = keys::lockout(&req.email);
+        if redis::exists(&self.redis, &lockout_key).await? {
+            warn!(email = %req.email, "Login attempt on locked account");
+            return Err(AppError::TooManyRequests("Account temporarily locked due to too many failed attempts. Try again later.".to_string()));
+        }
+
         let user = self
             .repo
             .find_user_by_email(&req.email)
             .await?;
-
+        
         let generic_error = || AppError::InvalidCredentials("Invalid email or password".to_string());
 
         let user = match user {
@@ -63,20 +86,25 @@ impl<R: AuthRepositoryTrait> AuthServiceTrait for AuthService<R> {
             .map_err(|e| AppError::Internal(anyhow::anyhow!("Thread join error: {}", e)))??;
 
         if !is_valid {
+            self.record_failed_attempt(&req.email);
             warn!(email = %req.email, "Failed login attempt - wrong password");
             return Err(generic_error());
         }
 
+        let failed_key = keys::failed_login(&req.email);
+        redis::del(&self.redis, &failed_key).await?;
+
         info!(user_id = user.id, "User logged in");
         let roles = user.roles.clone().unwrap_or_default();
-        let token = create_token(
-            user.id,
-            &roles,
-            &self.config.jwt_secret,
-            self.config.jwt_expires_in_secs
-        )?;
+        let access_token = create_access_token(user.id, &roles, &self.config.auth.paseto_key, ACCESS_TOKEN_TTL_SECS)?;
+        let refresh_token = generate_refresh_token(&self.config.auth.refresh_token_hmac_secret, self.config.auth.refresh_token_length_bytes)?;
 
-        Ok(AuthResponse::new(token, user))
+        let token_hash = hash_refresh_token(&refresh_token.raw_bytes);
+        let redis_key = keys::refresh_token(&token_hash);
+
+        redis::set_ex(&self.redis, &redis_key, &user.id.to_string(), self.config.auth.refresh_token_ttl_seconds()).await?;
+
+        Ok(AuthResponse::new(access_token, user))
     }
 
     async fn get_profile(&self, user_id: i64) -> AppResult<UserResponse>{

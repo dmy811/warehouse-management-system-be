@@ -43,8 +43,8 @@ pub enum AppError {
         requested: i32
     },
 
-    #[error("Rate limit exceeded")]
-    RateLimitExceeded,
+    #[error("Too Many Request: {0}")]
+    TooManyRequests(String),
 
     #[error("Cache error: {0}")]
     CacheError(String),
@@ -76,7 +76,7 @@ impl AppError {
             Self::Validation(_) => StatusCode::UNPROCESSABLE_ENTITY,
             Self::InsufficientStock { .. } => StatusCode::UNPROCESSABLE_ENTITY,
             Self::ServiceUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
-            Self::RateLimitExceeded => StatusCode::TOO_MANY_REQUESTS,
+            Self::TooManyRequests(_) => StatusCode::TOO_MANY_REQUESTS,
             Self::CacheError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Self::Database(_) | Self::Internal(_) | Self::InternalUi(_) => StatusCode::INTERNAL_SERVER_ERROR,
     
@@ -96,7 +96,7 @@ impl AppError {
             Self::Database(_) => code::DATABASE_ERROR,
             Self::TokenRevoked => code::TOKEN_REVOKED,
             Self::TokenReplayAttack => code::TOKEN_REPLAY_ATTACK,
-            Self::RateLimitExceeded => code::RATE_LIMIT_EXCEEDED,
+            Self::TooManyRequests(_) => code::TOO_MANY_REQUESTS,
             Self::CacheError(_) => code::CACHE_ERROR,
             Self::ServiceUnavailable(_) => code::SERVICE_UNAVAILABLE,
             Self::Internal(_) | Self::InternalUi(_) => code::INTERNAL_SERVER_ERROR,
