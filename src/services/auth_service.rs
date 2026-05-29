@@ -5,18 +5,20 @@ use deadpool_redis::Pool as RedisPool;
 use tracing::{info, warn};
 
 
-use crate::{dtos::{AuthResponse, LoginRequest, UserResponse, auth_dto::UpdatePasswordRequest, user_dto::UpdateUserRequest}, errors::{AppError, AppResult}, infrastructure::{config::Config, redis::{self, keys}}, repositories::AuthRepositoryTrait, utils::{crypto::{verify_password}, paseto::{create_access_token, generate_refresh_token, hash_refresh_token}}};
+use crate::{dtos::{AuthResponse, LoginRequest, UserResponse, auth_dto::UpdatePasswordRequest, user_dto::UpdateUserRequest}, errors::{AppError, AppResult}, infrastructure::{config::Config, redis::{self, keys}}, models::users::RefreshToken, repositories::AuthRepositoryTrait, utils::{crypto::verify_password, paseto::{create_access_token, generate_refresh_token, hash_refresh_token, verify_refresh_token}}};
 
 const ACCESS_TOKEN_TTL_SECS: i64 = 15 * 60; // 15 minutes
 
 #[async_trait]
 pub trait AuthServiceTrait: Send + Sync {
-    async fn login(&self, req: LoginRequest) -> AppResult<AuthResponse>;
+    async fn login(&self, req: LoginRequest) -> AppResult<(AuthResponse, String)>;
     async fn get_profile(&self, user_id: i64) -> AppResult<UserResponse>;
     async fn update_profile(&self, id: i64, req: UpdateUserRequest) -> AppResult<UserResponse>;
     async fn update_profile_photo(&self, user_id: i64, photo_url: &str) -> AppResult<()>;
     async fn delete_profile_photo(&self, user_id: i64) -> AppResult<()>;
     async fn update_profile_password(&self, user_id: i64, req: UpdatePasswordRequest) -> AppResult<()>;
+    async fn refresh(&self, refresh_token_cookie: &str) -> AppResult<(AuthResponse, String)>;
+    async fn logout(&self, refresh_token_cookie: &str) -> AppResult<()>;
 }
 
 pub struct AuthService<R: AuthRepositoryTrait> {
@@ -60,7 +62,7 @@ impl<R: AuthRepositoryTrait> AuthService<R> {
 
 #[async_trait]
 impl<R: AuthRepositoryTrait> AuthServiceTrait for AuthService<R> {
-    async fn login(&self, req: LoginRequest) -> AppResult<AuthResponse>{
+    async fn login(&self, req: LoginRequest) -> AppResult<(AuthResponse, String)>{
         let lockout_key = keys::lockout(&req.email);
         if redis::exists(&self.redis, &lockout_key).await? {
             warn!(email = %req.email, "Login attempt on locked account");
@@ -99,12 +101,62 @@ impl<R: AuthRepositoryTrait> AuthServiceTrait for AuthService<R> {
         let access_token = create_access_token(user.id, &roles, &self.config.auth.paseto_key, ACCESS_TOKEN_TTL_SECS)?;
         let refresh_token = generate_refresh_token(&self.config.auth.refresh_token_hmac_secret, self.config.auth.refresh_token_length_bytes)?;
 
-        let token_hash = hash_refresh_token(&refresh_token.raw_bytes);
-        let redis_key = keys::refresh_token(&token_hash);
+        let refresh_token_hash = hash_refresh_token(&refresh_token.raw_bytes);
+        let redis_key = keys::refresh_token(&refresh_token_hash);
 
         redis::set_ex(&self.redis, &redis_key, &user.id.to_string(), self.config.auth.refresh_token_ttl_seconds()).await?;
 
-        Ok(AuthResponse::new(access_token, user))
+        Ok((AuthResponse::new(access_token, user), refresh_token.token))
+    }
+
+    async fn logout(&self, refresh_token_cookie: &str) -> AppResult<()> {
+        let raw_bytes = verify_refresh_token(refresh_token_cookie, &self.config.auth.refresh_token_hmac_secret)
+            .unwrap_or_default();
+
+        if !raw_bytes.is_empty() {
+            let refresh_token_hash = hash_refresh_token(&raw_bytes);
+            redis::del(&self.redis, &keys::refresh_token(&refresh_token_hash)).await?;
+        }
+        Ok(())
+    }
+
+    async fn refresh(&self, refresh_token_cookie: &str) -> AppResult<(AuthResponse, String)> {
+        let raw_bytes = verify_refresh_token(refresh_token_cookie, &self.config.auth.refresh_token_hmac_secret)?;
+
+        let refresh_token_hash = hash_refresh_token(&raw_bytes);
+        let redis_key = keys::refresh_token(&refresh_token_hash);
+
+        let user_id_str = redis::get(&self.redis, &redis_key)
+            .await?
+            .ok_or(AppError::InvalidToken)?;
+
+        let user_id: i64 = user_id_str
+            .parse()
+            .map_err(|_| AppError::InvalidToken)?;
+
+        redis::del(&self.redis, &redis_key).await?;
+
+        let user = self
+            .repo
+            .find_user_by_id(user_id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("User".to_string()))?;
+
+        let roles = user.roles.clone().unwrap_or_default();
+
+        let access_token = create_access_token(user.id, &roles, &self.config.auth.paseto_key, ACCESS_TOKEN_TTL_SECS)?;
+        let refresh_token = generate_refresh_token(&self.config.auth.refresh_token_hmac_secret, self.config.auth.refresh_token_length_bytes)?;
+
+        let new_token_hash = hash_refresh_token(&refresh_token.raw_bytes);
+        let new_redis_key = keys::refresh_token(&new_token_hash);
+        redis::set_ex(&self.redis, &new_redis_key, &user_id.to_string(), self.config.auth.refresh_token_ttl_seconds()).await?;
+
+        info!(user_id = user_id, "Token refreshed");
+        Ok((
+            AuthResponse::new(access_token, user),
+            refresh_token.token
+        ))
+
     }
 
     async fn get_profile(&self, user_id: i64) -> AppResult<UserResponse>{
