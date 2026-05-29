@@ -5,6 +5,8 @@ use crate::{handlers::{auth_handler, upload_handler}, state::AppState};
 pub fn auth_public_routes() -> Router<AppState> {
     Router::new()
         .route("/auth/login", post(auth_handler::login))
+        .route("/auth/refresh", post(auth_handler::refresh))
+        .route("/auth/logout", post(auth_handler::logout))
 }
 
 pub fn auth_protected_routes() -> Router<AppState> {

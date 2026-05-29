@@ -159,6 +159,8 @@ impl<R: AuthRepositoryTrait> AuthServiceTrait for AuthService<R> {
 
     }
 
+    
+
     async fn get_profile(&self, user_id: i64) -> AppResult<UserResponse>{
         let user = self
             .repo
