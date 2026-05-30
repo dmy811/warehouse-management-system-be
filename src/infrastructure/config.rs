@@ -12,8 +12,6 @@ pub struct Config {
     pub cookie: CookieConfig,
     pub cors: CorsConfig,
     pub rate_limit: RateLimitConfig,
-    pub security: SecurityConfig,
-    pub metrics: MetricsConfig,
     pub cloudinary: CloudinaryConfig,
 }
 
@@ -27,8 +25,6 @@ impl Config {
             cookie: CookieConfig::from_env()?,
             cors: CorsConfig::from_env()?,
             rate_limit: RateLimitConfig::from_env()?,
-            security: SecurityConfig::from_env()?,
-            metrics: MetricsConfig::from_env()?,
             cloudinary: CloudinaryConfig::from_env()?,
         })
     }
@@ -296,55 +292,6 @@ impl RateLimitConfig {
                 .unwrap_or_else(|_| "150".into())
                 .parse()
                 .context("RATE_LIMIT_BURST must be a number")?,
-        })
-    }
-}
-
-// --- SecurityConfig ----------------------------------
-
-#[derive(Debug, Clone)]
-pub struct SecurityConfig {
-    pub csp_header: String,
-    pub hsts_max_age: u64,
-    pub audit_log_enabled: bool,
-}
-
-impl SecurityConfig {
-    fn from_env() -> Result<Self> {
-        Ok(Self {
-            csp_header: std::env::var("CSP_HEADER")
-                .unwrap_or_else(|_| "default-src 'self'".into())
-                .trim_matches('"')
-                .to_string(),
-            hsts_max_age: std::env::var("HSTS_MAX_AGE")
-                .unwrap_or_else(|_| "31536000".into())
-                .parse()
-                .context("HSTS_MAX_AGE must be a number")?,
-            audit_log_enabled: std::env::var("AUDIT_LOG_ENABLED")
-                .unwrap_or_else(|_| "false".into())
-                .parse()
-                .unwrap_or(false),
-        })
-    }
-}
-
-// --- MetricsConfig ----------------------------------
-
-#[derive(Debug, Clone)]
-pub struct MetricsConfig {
-    pub enabled: bool,
-    pub path: String,
-}
-
-impl MetricsConfig {
-    fn from_env() -> Result<Self> {
-        Ok(Self {
-            enabled: std::env::var("METRICS_ENABLED")
-                .unwrap_or_else(|_| "false".into())
-                .parse()
-                .unwrap_or(false),
-            path: std::env::var("METRICS_PATH")
-                .unwrap_or_else(|_| "/metrics".into()),
         })
     }
 }
