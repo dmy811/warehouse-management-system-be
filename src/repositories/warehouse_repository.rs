@@ -93,7 +93,7 @@ impl WarehouseRepositoryTrait for WarehouseRepository {
                 w.photo,
                 w.deleted_at,
                 w.created_at,
-                w.updated_at,warehouse_id
+                w.updated_at,
                 COUNT(DISTINCT i.product_id)   AS total_products,
                 COUNT(DISTINCT r.id)           AS total_racks
             FROM warehouses w

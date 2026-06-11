@@ -126,7 +126,7 @@ impl UserRepositoryTrait for UserRepository {
             LEFT JOIN roles r ON r.id = ur.role_id
             WHERE u.deleted_at IS NULL
                 AND ($1::TEXT IS NULL OR (LOWER(u.name) LIKE $1 OR LOWER(u.email) LIKE $1))
-            GROUP_BY u.id
+            GROUP BY u.id
             ORDER BY {sort_col} {sort_dir}
             LIMIT $2
             OFFSET $3

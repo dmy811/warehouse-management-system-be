@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS public.inventory_racks (
     created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
 
-    CONSTRAINT unique_inventory_racks UNIQUE(inventory_id, rack_id)
+    CONSTRAINT unique_inventory_racks UNIQUE(inventory_id, rack_id) -- composite otomatis membuat index jadi bisa menggunakan WHERE inventory_id = ? atau WHERE intventory_id = ? AND rack_id = ?. tetapi tidak optimal jika hanya WHERE rack_id = ?
 );
 
 CREATE INDEX idx_inventory_racks_rack_id ON public.inventory_racks(rack_id);
