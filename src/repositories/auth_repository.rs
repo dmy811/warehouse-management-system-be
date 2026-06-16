@@ -122,7 +122,7 @@ impl AuthRepositoryTrait for AuthRepository {
             r#"
             INSERT INTO users (name, email, password, phone)
             VALUES ($1, $2, $3, $4)
-            RETURNING *
+            RETURNING id, name, email, password, photo, phone, deleted_at, created_at, updated_at
             "#,
             name,
             email,
@@ -146,7 +146,7 @@ impl AuthRepositoryTrait for AuthRepository {
             phone = COALESCE($4, phone)
             WHERE id = $1
             AND deleted_at IS NULL
-            RETURNING *
+            RETURNING id, name, email, password, photo, phone, deleted_at, created_at, updated_at
             "#,
             id,
             name,

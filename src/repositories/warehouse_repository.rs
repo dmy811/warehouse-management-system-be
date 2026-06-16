@@ -75,15 +75,51 @@ impl WarehouseRepository {
 #[async_trait]
 impl WarehouseRepositoryTrait for WarehouseRepository {
     async fn find_all_warehouses(&self, query: &ListQuery) -> AppResult<(Vec<WarehouseWithStats>, i64)> {
-        let search_pattern = query
+        // let search_pattern = query
+        //     .search
+        //     .as_ref()
+        //     .map(|s| format!("%{}%", s.to_lowercase()));
+
+        let fts_query = query
             .search
             .as_ref()
-            .map(|s| format!("%{}%", s.to_lowercase()));
+            .map(|s| {
+                s.split_whitespace()
+                    .filter(|w| !w.is_empty())
+                    .map(|w| format!("{}:*", w.to_lowercase()))
+                    .collect::<Vec<_>>()
+                    .join(" & ")
+            });
  
         let sort_col = query.sort_column();
         let sort_dir = query.sort_direction();
  
-        let sql = format!(
+        // let sql_like_query = format!(
+        //     r#"
+        //     SELECT
+        //         w.id,
+        //         w.name,
+        //         w.address,
+        //         w.phone,
+        //         w.photo,
+        //         w.deleted_at,
+        //         w.created_at,
+        //         w.updated_at,
+        //         COUNT(DISTINCT i.product_id)   AS total_products,
+        //         COUNT(DISTINCT r.id)           AS total_racks
+        //     FROM warehouses w
+        //     LEFT JOIN inventories i ON i.warehouse_id = w.id
+        //     LEFT JOIN racks r       ON r.warehouse_id = w.id AND r.deleted_at IS NULL
+        //     WHERE w.deleted_at IS NULL
+        //       AND ($1::TEXT IS NULL OR (LOWER(w.name) LIKE $1 OR LOWER(w.address) LIKE $1))
+        //     GROUP BY w.id
+        //     ORDER BY {sort_col} {sort_dir}
+        //     LIMIT $2
+        //     OFFSET $3
+        //     "#
+        // );
+
+        let sql_fts = format!(
             r#"
             SELECT
                 w.id,
@@ -94,22 +130,27 @@ impl WarehouseRepositoryTrait for WarehouseRepository {
                 w.deleted_at,
                 w.created_at,
                 w.updated_at,
-                COUNT(DISTINCT i.product_id)   AS total_products,
-                COUNT(DISTINCT r.id)           AS total_racks
+                COUNT(DISTINCT i.product_id) AS total_products,
+                COUNT(DISTINCT r.id) AS total_racks
             FROM warehouses w
             LEFT JOIN inventories i ON i.warehouse_id = w.id
-            LEFT JOIN racks r       ON r.warehouse_id = w.id AND r.deleted_at IS NULL
+            LEFT JOIN racks r ON r.warehouse_id = w.id AND r.deleted_at IS NULL
             WHERE w.deleted_at IS NULL
-              AND ($1::TEXT IS NULL OR (LOWER(w.name) LIKE $1 OR LOWER(w.address) LIKE $1))
+                AND ($1::TEXT IS NULL OR w.search_vector @@ to_tsquery('simple', $1))
             GROUP BY w.id
-            ORDER BY {sort_col} {sort_dir}
+            ORDER BY
+                CASE WHEN $1 IS NOT NULL
+                    THEN ts_rank(w.search_vector, to_tsquery('simple', $1))
+                    ELSE 0
+                END DESC,
+                {sort_col} {sort_dir}
             LIMIT $2
             OFFSET $3
             "#
         );
  
-        let items = sqlx::query_as::<_, WarehouseWithStats>(&sql)
-            .bind(&search_pattern)
+        let items = sqlx::query_as::<_, WarehouseWithStats>(&sql_fts)
+            .bind(&fts_query)
             .bind(query.per_page())
             .bind(query.offset())
             .fetch_all(&self.db)
@@ -119,11 +160,11 @@ impl WarehouseRepositoryTrait for WarehouseRepository {
             SELECT COUNT(*)
             FROM warehouses w
             WHERE w.deleted_at IS NULL
-              AND ($1::TEXT IS NULL OR (LOWER(w.name) LIKE $1 OR LOWER(w.address) LIKE $1))
+              AND ($1::TEXT IS NULL OR w.search_vector @@ to_tsquery('simple', $1))
         "#;
  
         let total: i64 = sqlx::query_scalar(count_sql)
-            .bind(&search_pattern)
+            .bind(&fts_query)
             .fetch_one(&self.db)
             .await?;
  
@@ -134,7 +175,7 @@ impl WarehouseRepositoryTrait for WarehouseRepository {
         let warehouse = sqlx::query_as!(
             Warehouse,
             r#"
-            SELECT * FROM warehouses
+            SELECT id, name, address, phone, photo, deleted_at, created_at, updated_at FROM warehouses
             WHERE id = $1 AND deleted_at IS NULL
             "#,
             warehouse_id
@@ -171,7 +212,7 @@ impl WarehouseRepositoryTrait for WarehouseRepository {
             r#"
             INSERT INTO warehouses (name, address, photo, phone)
             VALUES ($1, $2, $3, $4)
-            RETURNING *
+            RETURNING id, name, address, phone, photo, deleted_at, created_at, updated_at
             "#,
             name,
             address,
@@ -204,7 +245,7 @@ impl WarehouseRepositoryTrait for WarehouseRepository {
                 updated_at = NOW()
             WHERE id = $1
             AND deleted_at IS NULL
-            RETURNING *
+            RETURNING id, name, address, phone, photo, deleted_at, created_at, updated_at
             "#,
             warehouse_id,
             name,

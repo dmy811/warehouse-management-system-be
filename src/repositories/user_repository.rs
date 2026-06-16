@@ -72,7 +72,7 @@ impl UserRepositoryTrait for UserRepository {
             r#"
             INSERT INTO users (name, email, password, phone)
             VALUES ($1, $2, $3, $4)
-            RETURNING *
+            RETURNING id, name, email, password, photo, phone, deleted_at, created_at, updated_at
             "#,
             name,
             email,
@@ -100,15 +100,51 @@ impl UserRepositoryTrait for UserRepository {
     }
 
     async fn find_all_users(&self, query: &ListQuery) -> AppResult<(Vec<UserWithRole>, i64)> {
-        let search_pattern = query
+        // let search_pattern = query
+        //     .search
+        //     .as_ref()
+        //     .map(|s| format!("%{}%", s.to_lowercase()));
+
+        let fts_query = query
             .search
             .as_ref()
-            .map(|s| format!("%{}%", s.to_lowercase()));
+            .map(|s| {
+                s.split_whitespace()
+                    .filter(|w| !w.is_empty())
+                    .map(|w| format!("{}:*", w.to_lowercase()))
+                    .collect::<Vec<_>>()
+                    .join(" & ")
+            });
 
         let sort_col = query.sort_column();
         let sort_dir = query.sort_direction();
 
-        let sql = format!(
+        // let sql_like_query = format!(
+        //     r#"
+        //     SELECT
+        //         u.id,
+        //         u.name,
+        //         u.email,
+        //         u.password,
+        //         u.photo,
+        //         u.phone,
+        //         u.deleted_at,
+        //         u.created_at,
+        //         u.updated_at,
+        //         ARRAY_AGG(r.name) FILTER (WHERE r.name IS NOT NULL) as "roles!"
+        //     FROM users u
+        //     LEFT JOIN user_roles ur ON ur.user_id = u.id
+        //     LEFT JOIN roles r ON r.id = ur.role_id
+        //     WHERE u.deleted_at IS NULL
+        //         AND ($1::TEXT IS NULL OR (LOWER(u.name) LIKE $1 OR LOWER(u.email) LIKE $1))
+        //     GROUP BY u.id
+        //     ORDER BY {sort_col} {sort_dir}
+        //     LIMIT $2
+        //     OFFSET $3
+        //     "#
+        // );
+
+        let sql_fts = format!(
             r#"
             SELECT
                 u.id,
@@ -120,21 +156,27 @@ impl UserRepositoryTrait for UserRepository {
                 u.deleted_at,
                 u.created_at,
                 u.updated_at,
-                ARRAY_AGG(r.name) FILTER (WHERE r.name IS NOT NULL) as "roles!"
+                ARRAY_AGG(r.name) FILTER (WHERE r.name IS NOT NULL) AS "roles!"
             FROM users u
             LEFT JOIN user_roles ur ON ur.user_id = u.id
             LEFT JOIN roles r ON r.id = ur.role_id
             WHERE u.deleted_at IS NULL
-                AND ($1::TEXT IS NULL OR (LOWER(u.name) LIKE $1 OR LOWER(u.email) LIKE $1))
+                AND ($1::TEXT IS NULL OR u.search_vector @@ to_tsquery('simple', $1))
             GROUP BY u.id
-            ORDER BY {sort_col} {sort_dir}
+            ORDER BY
+                CASE WHEN $1 IS NOT NULL
+                    THEN ts_rank(u.search_vector, to_tsquery('simple', $1))
+                    ELSE 0
+                END DESC,
+                {sort_col} {sort_dir}
             LIMIT $2
             OFFSET $3
             "#
         );
 
-        let items = sqlx::query_as::<_, UserWithRole>(&sql)
-            .bind(&search_pattern)
+
+        let items = sqlx::query_as::<_, UserWithRole>(&sql_fts)
+            .bind(&fts_query)
             .bind(query.per_page())
             .bind(query.offset())
             .fetch_all(&self.db)
@@ -144,11 +186,11 @@ impl UserRepositoryTrait for UserRepository {
             SELECT COUNT(*)
             FROM users u
             WHERE u.deleted_at IS NULL
-              AND ($1::TEXT IS NULL OR (LOWER(u.name) LIKE $1 OR LOWER(u.email) LIKE $1))
+              AND ($1::TEXT IS NULL OR u.search_vector @@ to_tsquery('simple', $1))
         "#;
  
         let total: i64 = sqlx::query_scalar(count_sql)
-            .bind(&search_pattern)
+            .bind(&fts_query)
             .fetch_one(&self.db)
             .await?;
  
@@ -196,7 +238,7 @@ impl UserRepositoryTrait for UserRepository {
             phone = COALESCE($4, phone)
             WHERE id = $1
             AND deleted_at IS NULL
-            RETURNING *
+            RETURNING id, name, email, password, photo, phone, deleted_at, created_at, updated_at
             "#,
             user_id,
             name,

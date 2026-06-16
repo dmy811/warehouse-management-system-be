@@ -13,7 +13,7 @@ ON public.users USING GIN(search_vector);
 ALTER TABLE public.warehouses
 ADD COLUMN search_vector tsvector
     GENERATED ALWAYS AS (
-        to_tsvector('simple', COALESCE(name, '') || ' ' || COALESCE(email, ''))
+        to_tsvector('simple', COALESCE(name, '') || ' ' || COALESCE(address, ''))
     ) STORED;
 
 CREATE INDEX idx_warehouses_search_vector

@@ -43,7 +43,7 @@ impl ListQuery {
 
     pub fn sort_direction(&self) -> &str {
         match self.sort_order.to_lowercase().as_str() {
-            "asc" => "ASC",
+            "asc" | "ASC" => "ASC",
             _ => "DESC", // default
         }
     }
