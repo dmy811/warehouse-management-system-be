@@ -100,7 +100,7 @@ impl UserRepositoryTrait for UserRepository {
     }
 
     async fn find_all_users(&self, query: &ListQuery) -> AppResult<(Vec<UserWithRole>, i64)> {
-        // let search_pattern = query
+        // let like_query = query
         //     .search
         //     .as_ref()
         //     .map(|s| format!("%{}%", s.to_lowercase()));
@@ -116,10 +116,15 @@ impl UserRepositoryTrait for UserRepository {
                     .join(" & ")
             });
 
-        let sort_col = query.sort_column();
+        let sort_col = match query.sort_by() {
+            "name" => "w.name",
+            "email" => "w.email",
+            "updated_at" => "w.updated_at",
+            _ => "w.created_at"
+        };
         let sort_dir = query.sort_direction();
 
-        // let sql_like_query = format!(
+        // let sql_like = format!(
         //     r#"
         //     SELECT
         //         u.id,

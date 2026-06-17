@@ -33,18 +33,14 @@ impl ListQuery {
         self.per_page.clamp(1, 100)
     }
 
-    pub fn sort_column(&self) -> &str {
-        match self.sort_by.as_str() {
-            "name" => "w.name",
-            "updated_at" => "w.updated_at",
-            _ => "w.created_at" // default
-        }
+    pub fn sort_by(&self) -> &str {
+        &self.sort_by
     }
 
     pub fn sort_direction(&self) -> &str {
         match self.sort_order.to_lowercase().as_str() {
-            "asc" | "ASC" => "ASC",
-            _ => "DESC", // default
+            "asc" => "ASC",
+            _ => "DESC",
         }
     }
 }
