@@ -10,7 +10,7 @@ use crate::{
 #[async_trait]
 pub trait WarehouseRepositoryTrait: Send + Sync {
     async fn find_all_warehouses(&self, query: &ListQuery) -> AppResult<(Vec<WarehouseWithStats>, i64)>;
-    async fn find_warehouse_by_id(&self, id: i64) -> AppResult<Option<Warehouse>>;
+    async fn find_warehouse_by_id(&self, id: i64) -> AppResult<Option<WarehouseWithStats>>;
     async fn check_name_exists(&self, name: &str, exclude_id: Option<i64>) -> AppResult<bool>;
     async fn create_warehouse(&self, name: &str, address: &str, phone: Option<&str>, photo: Option<&str>) -> AppResult<Warehouse>;
     async fn update_warehouse(&self, warehouse_id: i64, name: Option<&str>, address: Option<&str>, phone: Option<&str>, photo: Option<&str>) -> AppResult<Option<Warehouse>>;
@@ -176,12 +176,26 @@ impl WarehouseRepositoryTrait for WarehouseRepository {
         Ok((items, total))
     }
 
-    async fn find_warehouse_by_id(&self, warehouse_id: i64) -> AppResult<Option<Warehouse>> {
+    async fn find_warehouse_by_id(&self, warehouse_id: i64) -> AppResult<Option<WarehouseWithStats>> {
         let warehouse = sqlx::query_as!(
-            Warehouse,
+            WarehouseWithStats,
             r#"
-            SELECT id, name, address, phone, photo, deleted_at, created_at, updated_at FROM warehouses
-            WHERE id = $1 AND deleted_at IS NULL
+            SELECT
+                w.id,
+                w.name,
+                w.address,
+                w.phone,
+                w.photo,
+                w.deleted_at,
+                w.created_at,
+                w.updated_at,
+                COUNT(DISTINCT i.product_id) AS total_products,
+                COUNT(DISTINCT r.id) AS total_racks
+            FROM warehouses w
+            LEFT JOIN inventories i ON i.warehouse_id = w.id
+            LEFT JOIN racks r ON r.warehouse_id = w.id AND r.deleted_at IS NULL
+            WHERE w.id = $1 AND w.deleted_at IS NULL
+            GROUP BY w.id
             "#,
             warehouse_id
         )

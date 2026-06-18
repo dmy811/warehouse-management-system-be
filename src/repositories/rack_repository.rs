@@ -5,7 +5,7 @@ use crate::{errors::AppResult, models::{Rack, RackWithStats, params::rack_params
 #[async_trait]
 pub trait RackRepositoryTrait: Send + Sync {
     async fn find_all(&self, warehouse_id: i64, query: &ListQuery) -> AppResult<(Vec<RackWithStats>, i64)>;
-    async fn find_by_id(&self, id: i64, warehouse_id: i64) -> AppResult<Option<Rack>>;
+    async fn find_by_id(&self, id: i64, warehouse_id: i64) -> AppResult<Option<RackWithStats>>;
     async fn code_exists(&self, code: &str, warehouse_id: i64, exclude_id: Option<i64>) -> AppResult<bool>;
     async fn create(&self, params: CreateRackParams<'_>) -> AppResult<Rack>;
     async fn update(
@@ -60,7 +60,7 @@ impl RackRepositoryTrait for RackRepository {
                 r.deleted_at,
                 r.created_at,
                 r.updated_at,
-            COALESCE(SUM(ir.quantity), 0) AS "used_capacity!",
+            COALESCE(SUM(ir.quantity), 0)::BIGINT AS "used_capacity!",
             COUNT(DISTINCT i.product_id)::BIGINT AS "total_products!"
             FROM racks r
             LEFT JOIN inventory_racks ir ON ir.rack_id = r.id
@@ -99,13 +99,29 @@ impl RackRepositoryTrait for RackRepository {
 
         Ok((items, total))
     }
-    async fn find_by_id(&self, id: i64, warehouse_id: i64) -> AppResult<Option<Rack>>{
+
+    async fn find_by_id(&self, id: i64, warehouse_id: i64) -> AppResult<Option<RackWithStats>>{
         let rack = sqlx::query_as!(
-            Rack,
+            RackWithStats,
             r#"
-            SELECT id, warehouse_id, code, zone, level, description, capacity, deleted_at, created_at, updated_at
-            FROM racks
-            WHERE id = $1 AND warehouse_id = $2 AND deleted_at IS NULL
+            SELECT
+                r.id,
+                r.warehouse_id,
+                r.code,
+                r.zone,
+                r.level,
+                r.description,
+                r.capacity,
+                r.deleted_at,
+                r.created_at,
+                r.updated_at,
+                COALESCE(SUM(ir.quantity), 0)::BIGINT AS "used_capacity!",
+                COUNT(DISTINCT i.product_id)::BIGINT AS "total_products!"
+            FROM racks r
+            LEFT JOIN inventory_racks ir ON ir.rack_id = r.id
+            LEFT JOIN inventories i ON i.id = ir.inventory_id
+            WHERE r.id = $1 AND r.warehouse_id = $2 AND r.deleted_at IS NULL
+            GROUP BY r.id
             "#,
             id,
             warehouse_id

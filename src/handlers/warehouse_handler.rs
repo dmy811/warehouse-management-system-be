@@ -18,7 +18,7 @@ pub async fn get_warehouse_by_id(
     Extension(_auth_user): Extension<AuthUser>,
     Path(id): Path<i64>
 ) -> AppResult<impl IntoResponse> {
-    let warehouse: WarehouseResponse = state.services.warehouse.get_warehouse_by_id(id).await?;
+    let warehouse: WarehouseSummary = state.services.warehouse.get_warehouse_by_id(id).await?;
 
     Ok(ApiResponse::ok("Warehouse retrieved", warehouse))
 }

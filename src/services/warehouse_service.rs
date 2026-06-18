@@ -8,7 +8,7 @@ use crate::{dtos::{CreateWarehouseRequest, UpdateWarehouseRequest, WarehouseResp
 #[async_trait]
 pub trait WarehouseServiceTrait: Send + Sync {
     async fn get_all_warehouses(&self, query: ListQuery) -> AppResult<PaginatedResponse<WarehouseSummary>>;
-    async fn get_warehouse_by_id(&self, id: i64) -> AppResult<WarehouseResponse>;
+    async fn get_warehouse_by_id(&self, id: i64) -> AppResult<WarehouseSummary>;
     async fn create_warehouse(&self, req: CreateWarehouseRequest, actor_id: i64) -> AppResult<WarehouseResponse>;
     async fn update_warehouse(&self, warehouse_id: i64, req: UpdateWarehouseRequest, actor_id: i64) -> AppResult<WarehouseResponse>;
     async fn delete_warehouse_soft(&self, warehouse_id: i64, actor_id: i64) -> AppResult<()>;
@@ -43,14 +43,14 @@ impl<R: WarehouseRepositoryTrait> WarehouseServiceTrait for WarehouseService<R> 
         Ok(PaginatedResponse::new(items, total, query.page, query.per_page))
     }
 
-    async fn get_warehouse_by_id(&self, warehouse_id: i64) -> AppResult<WarehouseResponse> {
+    async fn get_warehouse_by_id(&self, warehouse_id: i64) -> AppResult<WarehouseSummary> {
         let warehouse = self
             .repo
             .find_warehouse_by_id(warehouse_id)
             .await?
             .ok_or_else(|| AppError::NotFound(format!("Warehouse with id {}", warehouse_id)))?;
 
-        Ok(WarehouseResponse::from(warehouse))
+        Ok(WarehouseSummary::from(warehouse))
     }
 
     async fn create_warehouse(&self, req: CreateWarehouseRequest, actor_id: i64) -> AppResult<WarehouseResponse> {
