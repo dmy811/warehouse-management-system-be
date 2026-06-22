@@ -5,7 +5,7 @@ use deadpool_redis::Pool as RedisPool;
 use tracing::{info, warn};
 
 
-use crate::{dtos::{AuthResponse, LoginRequest, UserResponse, auth_dto::UpdatePasswordRequest, user_dto::UpdateUserRequest}, errors::{AppError, AppResult}, infrastructure::{config::Config, redis::{self, keys}}, models::users::RefreshToken, repositories::AuthRepositoryTrait, utils::{crypto::verify_password, paseto::{create_access_token, generate_refresh_token, hash_refresh_token, verify_refresh_token}}};
+use crate::{dtos::{AuthResponse, LoginRequest, UserResponse, auth_dto::UpdatePasswordRequest, user_dto::UpdateUserRequest}, errors::{AppError, AppResult}, infrastructure::{config::Config, redis::{self, keys}}, repositories::AuthRepositoryTrait, utils::{crypto::verify_password, paseto::{create_access_token, generate_refresh_token, hash_refresh_token, verify_refresh_token}}};
 
 const ACCESS_TOKEN_TTL_SECS: i64 = 15 * 60; // 15 minutes
 
@@ -88,7 +88,7 @@ impl<R: AuthRepositoryTrait> AuthServiceTrait for AuthService<R> {
             .map_err(|e| AppError::Internal(anyhow::anyhow!("Thread join error: {}", e)))??;
 
         if !is_valid {
-            self.record_failed_attempt(&req.email);
+            self.record_failed_attempt(&req.email).await?;
             warn!(email = %req.email, "Failed login attempt - wrong password");
             return Err(generic_error());
         }
@@ -172,7 +172,7 @@ impl<R: AuthRepositoryTrait> AuthServiceTrait for AuthService<R> {
     }
 
      async fn update_profile(&self, id: i64, req: UpdateUserRequest) -> AppResult<UserResponse> {
-        let user = self.repo
+        self.repo
             .find_user_by_id(id)
             .await?
             .ok_or_else(|| AppError::NotFound(format!("User with id {}", id)))?;
@@ -185,9 +185,10 @@ impl<R: AuthRepositoryTrait> AuthServiceTrait for AuthService<R> {
                 )));
             }
         }
-        self.repo
+        let user = self.repo
             .update_user(id, req.name.as_deref(), req.email.as_deref(), req.phone.as_deref())
-            .await?;
+            .await?
+            .ok_or_else(|| AppError::NotFound(format!("User with id {}", id)))?;
         
         Ok(UserResponse::from(user))
     }
@@ -222,6 +223,38 @@ impl<R: AuthRepositoryTrait> AuthServiceTrait for AuthService<R> {
         Ok(())
     }
 }
+
+// #[cfg(test)]
+// mod tests {
+//     use std::sync::Arc;
+//     use async_trait::async_trait;
+//     use chrono::Utc;
+//     use mockall::mock;
+
+//     use crate::{
+//         dtos::{auth_dto::UpdatePasswordRequest, user_dto::UpdateUserRequest},
+//         errors::{AppError, AppResult},
+//         models::users::{User, UserWithRole},
+//         repositories::AuthRepositoryTrait,
+//         services::auth_service::{AuthService, AuthServiceTrait}
+//     };
+
+
+//      mock! {
+//         AuthRepo {}
+ 
+//         #[async_trait]
+//         impl AuthRepositoryTrait for AuthRepo {
+//             async fn find_user_by_email(&self, email: &str) -> AppResult<Option<UserWithRole>>;
+//             async fn find_user_by_id(&self, user_id: i64) -> AppResult<Option<UserWithRole>>;
+//             async fn check_email_exists(&self, email: &str) -> AppResult<bool>;
+//             async fn update_user(&self, id: i64, name: Option<&str>, email: Option<&str>, phone: Option<&str>) -> AppResult<Option<User>>;
+//             async fn update_user_photo(&self, user_id: i64, photo_url: &str) -> AppResult<()>;
+//             async fn clear_user_photo(&self, user_id: i64) -> AppResult<()>;
+//             async fn update_user_password(&self, user_id:i64, password: &str) -> AppResult<()>;
+//         }
+//     }
+// }
 
 
 // #[cfg(test)]

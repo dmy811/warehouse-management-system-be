@@ -3,17 +3,27 @@ use sqlx::PgPool;
 
 use crate::{
     errors::AppResult,
-    models::{UserWithRole, Warehouse, WarehouseWithStats},
+    models::{Warehouse, WarehouseWithStats},
     response::ListQuery
 };
 
+#[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait WarehouseRepositoryTrait: Send + Sync {
     async fn find_all_warehouses(&self, query: &ListQuery) -> AppResult<(Vec<WarehouseWithStats>, i64)>;
     async fn find_warehouse_by_id(&self, id: i64) -> AppResult<Option<WarehouseWithStats>>;
     async fn check_name_exists(&self, name: &str, exclude_id: Option<i64>) -> AppResult<bool>;
-    async fn create_warehouse(&self, name: &str, address: &str, phone: Option<&str>, photo: Option<&str>) -> AppResult<Warehouse>;
-    async fn update_warehouse(&self, warehouse_id: i64, name: Option<&str>, address: Option<&str>, phone: Option<&str>, photo: Option<&str>) -> AppResult<Option<Warehouse>>;
+    async fn create_warehouse<'a>(&self,
+        name: &'a str, 
+        address: &'a str, 
+        phone: Option<&'a str>, 
+        photo: Option<&'a str>
+    ) -> AppResult<Warehouse>;
+    async fn update_warehouse<'a>(&self, warehouse_id: i64, name: Option<&'a str>,
+        address: Option<&'a str>,
+        phone: Option<&'a str>,
+        photo: Option<&'a str>
+    ) -> AppResult<Option<Warehouse>>;
     async fn warehouse_soft_delete(&self, warehouse_id: i64) -> AppResult<bool>;
     async fn warehouse_hard_delete(&self, warehouse_id: i64) -> AppResult<bool>;
     async fn update_warehouse_photo(&self, warehouse_id: i64, photo_url: &str) -> AppResult<()>;
@@ -225,7 +235,12 @@ impl WarehouseRepositoryTrait for WarehouseRepository {
         Ok(exists)
     }
 
-    async fn create_warehouse(&self, name: &str, address: &str, phone: Option<&str>, photo: Option<&str>) -> AppResult<Warehouse> {
+    async fn create_warehouse<'a>(&self,
+        name: &'a str, 
+        address: &'a str, 
+        phone: Option<&'a str>, 
+        photo: Option<&'a str>
+    ) -> AppResult<Warehouse> {
         let warehouse = sqlx::query_as!(
             Warehouse,
             r#"
@@ -245,13 +260,13 @@ impl WarehouseRepositoryTrait for WarehouseRepository {
 
     }
 
-    async fn update_warehouse(
+    async fn update_warehouse<'a>(
         &self,
         warehouse_id: i64,
-        name: Option<&str>,
-        address: Option<&str>,
-        phone: Option<&str>,
-        photo: Option<&str>,
+        name: Option<&'a str>,
+        address: Option<&'a str>,
+        phone: Option<&'a str>,
+        photo: Option<&'a str>
     ) -> AppResult<Option<Warehouse>> {
         let warehouse = sqlx::query_as!(
             Warehouse,

@@ -4,17 +4,24 @@ use regex::Regex;
 use crate::constants::permissions;
 
 // Indonesian phone number: +62xxx or 08xxx, 10 - 15 digits total
+/// Valid: `+628123456789`, `081234567890`
+/// Invalid: `12345`, `+1234567890` (non-Indonesian prefix)
 pub static PHONE_ID_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^(\+62|08)[0-9]{8,12}$").expect("valid regex")
+    Regex::new(r"^(\+62|08)[0-9]{8,12}$").expect("phone valid regex")
 });
 
 // SKU format: upparcase letters, digits, hypens only, 3 – 50 chars.. E.g. WMS-PROD-001
+/// Validates SKU format — uppercase alphanumeric with hyphens, 3 – 50 chars.
 static SKU_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^[A-Z0-9][A-Z0-9\-]{1,48}[A-Z0-9]$").expect("valid regex")
+    Regex::new(r"^[A-Z0-9][A-Z0-9\-]{1,48}[A-Z0-9]$").expect("sku valid regex")
 });
 
-/// Valid: `+628123456789`, `081234567890`
-/// Invalid: `12345`, `+1234567890` (non-Indonesian prefix)
+// kapital, angka, dan strip (misal: "RACK-A01")
+static RACK_CODE_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^[A-Z0-9\-]+$").expect("rack code valid regex")
+});
+
+
 pub fn validate_indonesian_phone(phone: &str) -> Result<(), validator::ValidationError> {
     if PHONE_ID_REGEX.is_match(phone) {
         Ok(())
@@ -26,7 +33,7 @@ pub fn validate_indonesian_phone(phone: &str) -> Result<(), validator::Validatio
     }
 }
 
-/// Validates SKU format — uppercase alphanumeric with hyphens, 3 – 50 chars.
+
 pub fn validate_sku(sku: &str) -> Result<(), validator::ValidationError> {
     if SKU_REGEX.is_match(sku) {
         Ok(())
@@ -38,6 +45,8 @@ pub fn validate_sku(sku: &str) -> Result<(), validator::ValidationError> {
         Err(err)
     }
 }
+// pub fn validate_rack_code
+
 
 pub fn validate_role(role: &str) -> Result<(), validator::ValidationError> {
     if !permissions::ALL_ROLES.contains(&role) {

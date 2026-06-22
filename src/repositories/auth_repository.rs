@@ -14,7 +14,6 @@ pub trait AuthRepositoryTrait: Send + Sync {
     async fn find_user_by_email(&self, email: &str) -> AppResult<Option<UserWithRole>>;
     async fn find_user_by_id(&self, user_id: i64) -> AppResult<Option<UserWithRole>>;
     async fn check_email_exists(&self, email: &str) -> AppResult<bool>;
-    async fn create_user(&self, name: &str, email: &str, password_hash: &str, phone: Option<&str>) -> AppResult<User>;
     async fn update_user(&self, id: i64, name: Option<&str>, email: Option<&str>, phone: Option<&str>) -> AppResult<Option<User>>;
     async fn update_user_photo(&self, user_id: i64, photo_url: &str) -> AppResult<()>;
     async fn clear_user_photo(&self, user_id: i64) -> AppResult<()>;
@@ -109,32 +108,6 @@ impl AuthRepositoryTrait for AuthRepository {
 
         Ok(exists)
     }
-
-    async fn create_user(
-        &self,
-        name: &str,
-        email: &str,
-        password_hash: &str,
-        phone: Option<&str>
-    ) -> AppResult<User> {
-        let user = sqlx::query_as!(
-            User,
-            r#"
-            INSERT INTO users (name, email, password, phone)
-            VALUES ($1, $2, $3, $4)
-            RETURNING id, name, email, password, photo, phone, deleted_at, created_at, updated_at
-            "#,
-            name,
-            email,
-            password_hash,
-            phone
-        )
-        .fetch_one(&self.db)
-        .await?;
-
-        Ok(user)
-    }
-
 
     async fn update_user(&self, id: i64, name: Option<&str>, email: Option<&str>, phone: Option<&str>) -> AppResult<Option<User>> {
         let user = sqlx::query_as!(

@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
-use crate::{errors::AppError, models::UserWithRole, validators::common::{validate_indonesian_phone, validate_password_strength, validate_role}};
+use crate::{errors::AppError, models::{User, UserWithRole}, validators::common::{validate_indonesian_phone, validate_password_strength, validate_role}};
 
 #[derive(Debug, Deserialize, Validate)]
 pub struct CreateUserRequest {
@@ -83,6 +83,20 @@ impl From<UserWithRole> for UserResponse {
             phone: u.phone,
             photo: u.photo,
             roles: u.roles.unwrap_or_default(),
+            created_at: u.created_at
+        }
+    }
+}
+
+impl From<User> for UserResponse {
+    fn from(u: User) -> Self {
+         Self {
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            phone: u.phone,
+            photo: u.photo,
+            roles: vec![],
             created_at: u.created_at
         }
     }

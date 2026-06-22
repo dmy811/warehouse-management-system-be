@@ -216,3 +216,73 @@ impl<R: WarehouseRepositoryTrait> WarehouseServiceTrait for WarehouseService<R> 
 
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Arc;
+    use chrono::Utc;
+use mockall::predicate::*;
+
+    use crate::{
+        dtos::{CreateWarehouseRequest, UpdateWarehouseRequest}, errors::AppError, models::WarehouseWithStats, repositories::warehouse_repository::MockWarehouseRepositoryTrait
+    };
+
+    fn setup_service(repo: MockWarehouseRepositoryTrait) -> WarehouseService<MockWarehouseRepositoryTrait> {
+        WarehouseService::new(Arc::new(repo))
+    }
+
+    fn mock_warehouse(id: i64, name: &str, address: &str) -> WarehouseWithStats {
+        WarehouseWithStats {
+            id,
+            name: name.to_string(),
+            address: address.to_string(),
+            photo: None,
+            phone: None,
+            deleted_at: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            total_products: Some(10),
+            total_racks: Some(5)
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_warehouse_by_id_success(){
+        let mut mock_repo = MockWarehouseRepositoryTrait::new();
+        mock_repo
+            .expect_find_warehouse_by_id()
+            .with(eq(1))
+            .times(1)
+            .returning(|_| Ok(Some(mock_warehouse(1, "Gudang Jakarta", "Jl. Merdeka No 1"))));
+
+        let service = setup_service(mock_repo);
+        let result = service.get_warehouse_by_id(1).await;
+
+        
+        assert!(result.is_ok(), "Expected to return Ok(WarehouseSummary)");
+        let warehouse_summary = result.unwrap(); 
+
+        assert_eq!(warehouse_summary.id, 1); 
+        assert_eq!(warehouse_summary.name, "Gudang Jakarta");
+    }
+
+    #[tokio::test]
+    async fn test_get_warehouse_by_id_not_found(){
+        let mut mock_repo = MockWarehouseRepositoryTrait::new();
+        mock_repo.expect_find_warehouse_by_id()
+        .with(eq(99))
+        .times(1)
+        .returning(|_| Ok(None));
+
+        let service = setup_service(mock_repo);
+        let result = service.get_warehouse_by_id(99).await;
+
+        assert!(result.is_err(), "Exptected to return an Error Not Found");
+        
+        let err = result.unwrap_err();
+
+        assert!(matches!(err, AppError::NotFound(_)), "The expected type is NotFound");
+        assert_eq!(err.to_string(), "Warehouse with id 99 not found");
+    }
+}

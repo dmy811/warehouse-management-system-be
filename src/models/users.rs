@@ -39,20 +39,6 @@ pub struct UserWithRole {
     pub updated_at: DateTime<Utc>
 }
 
-#[derive(Debug, Clone, FromRow)]
-pub struct RefreshToken {
-    pub id: i64,
-    pub token_id: Uuid,
-    pub token_hash: String,
-    pub user_id: i64,
-    pub expires_at: DateTime<Utc>,
-    pub revoked_at: Option<DateTime<Utc>>,
-    pub created_at: DateTime<Utc>,
-    pub last_used_at: Option<DateTime<Utc>>,
-    pub ip_address: Option<String>,
-    pub user_agent: Option<String>,
-}
-
 // use chrono::{DateTime, Utc, TimeZone};
 
 // // Chrono memiliki banyak method utility
