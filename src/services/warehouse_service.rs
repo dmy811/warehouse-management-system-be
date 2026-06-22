@@ -238,6 +238,35 @@ use mockall::predicate::*;
     }
 
     #[tokio::test]
+    async fn test_get_all_warehouses_success(){
+        let query = ListQuery {
+            page: 1,
+            per_page: 20,
+            search: Some("jakarta".to_string()),
+            sort_by: "id".to_string(),
+            sort_order: "asc".to_string()
+        };
+        let mut mock_repo = MockWarehouseRepositoryTrait::new();
+        mock_repo
+            .expect_find_all_warehouses()
+            // .withf(|q: &ListQuery| {
+            //     q.page == 1 
+            //         && q.per_page == 20 
+            //         && q.search == Some("jakarta".to_string())
+            //         && q.sort_by == "id"
+            //         && q.sort_order == "asc"
+            // }) jika tidak pakai atribut PartialEq di structnya pakai withf
+            .with(eq(query.clone()))
+            .times(1)
+            .returning(|_| Ok((vec![], 20)));
+
+        let service = setup_service(mock_repo);
+        let result = service.get_all_warehouses(query).await;
+
+        assert!(result.is_ok(), "Expected return all warehouses data")
+    }
+
+    #[tokio::test]
     async fn test_get_warehouse_by_id_success(){
         let mut mock_repo = MockWarehouseRepositoryTrait::new();
         mock_repo
@@ -338,6 +367,233 @@ use mockall::predicate::*;
         let err = result.unwrap_err();
         assert!(matches!(err, AppError::Conflict(_)), "The expected type is Conflict");
         assert_eq!(err.to_string(), "Warehouse with name 'Gudang Duplikat' already exists");
+    }
+
+    #[tokio::test]
+    async fn test_update_warehouse_success() {
+        let req = UpdateWarehouseRequest {
+            name: Some("Gudang Sukses".to_string()),
+            address: Some("Jl. Baru No 5".to_string()),
+            phone: Some("   ".to_string()),
+            photo: None,
+        };
+
+        let mut mock_repo = MockWarehouseRepositoryTrait::new();
+
+        mock_repo
+            .expect_find_warehouse_by_id()
+            .with(eq(10))
+            .times(1)
+            .returning(|_| Ok(Some(mock_warehouse_with_stats(10, "Gudang Lama", "Jl. Lama"))));
+
+        mock_repo
+            .expect_check_name_exists()
+            .with(eq("Gudang Sukses".to_string()), eq(Some(10)))
+            .times(1)
+            .returning(|_, _| Ok(false));
+
+        mock_repo
+            .expect_update_warehouse()
+            .withf(|id: &i64, name: &Option<&str>, address: &Option<&str>, phone: &Option<&str>, photo: &Option<&str>| {
+                *id == 10 
+                    && *name == Some("Gudang Sukses") 
+                    && *address == Some("Jl. Baru No 5") 
+                    && phone.is_none()  
+                    && photo.is_none()
+            })
+            .times(1)
+            .returning(|id, _, _, _, _| Ok(Some(mock_warehouse(id, "Gudang Sukses", "Jl. Baru No 5"))));
+
+        let service = setup_service(mock_repo);
+        let result = service.update_warehouse(10, req, 1).await;
+
+        assert!(result.is_ok(), "Expected to return Ok(WarehouseResponse)");
+        let response = result.unwrap();
+        assert_eq!(response.id, 10);
+        assert_eq!(response.name, "Gudang Sukses");
+    }
+
+    #[tokio::test]
+    async fn test_update_warehouse_not_found(){
+        let req = UpdateWarehouseRequest {
+            name: Some("Gudang Eksis".to_string()),
+            address: None,
+            phone: None,
+            photo: None,
+        };
+
+        let mut mock_repo = MockWarehouseRepositoryTrait::new();
+        mock_repo
+            .expect_find_warehouse_by_id()
+            .with(eq(10))
+            .times(1)
+            .returning(|_| Ok(None));
+
+        let service = setup_service(mock_repo);
+        let result = service.update_warehouse(10, req, 1).await;
+
+        assert!(result.is_err(), "Exptected to return an Error Not Found");
+
+        let err = result.unwrap_err();
+
+        assert!(matches!(err, AppError::NotFound(_)), "The expected type is NotFound");
+        assert_eq!(err.to_string(), "Warehouse with id 10 not found");
+    }
+
+    #[tokio::test]
+    async fn test_update_warehouse_conflict() {
+        let req = UpdateWarehouseRequest {
+            name: Some("Gudang Eksis".to_string()),
+            address: None,
+            phone: None,
+            photo: None,
+        };
+
+        let mut mock_repo = MockWarehouseRepositoryTrait::new();
+
+        mock_repo
+            .expect_find_warehouse_by_id()
+            .with(eq(10))
+            .times(1)
+            .returning(|_| Ok(Some(mock_warehouse_with_stats(10, "Gudang Lama", "Jl. Lama"))));
+
+        mock_repo
+            .expect_check_name_exists()
+            .with(eq("Gudang Eksis".to_string()), eq(Some(10)))
+            .times(1)
+            .returning(|_, _| Ok(true)); // Mengembalikan TRUE untuk memicu eror Conflict
+
+        let service = setup_service(mock_repo);
+        let result = service.update_warehouse(10, req, 1).await;
+
+        assert!(result.is_err(), "Expected to return an Error Conflict");
+        let err = result.unwrap_err();
+        assert!(matches!(err, AppError::Conflict(_)), "The expected type is Conflict");
+        assert_eq!(err.to_string(), "Warehouse with name 'Gudang Eksis' already exists");
+    }
+
+        #[tokio::test]
+    async fn test_delete_warehouse_soft_success() {
+        let mut mock_repo = MockWarehouseRepositoryTrait::new();
+
+        mock_repo
+            .expect_find_warehouse_by_id()
+            .with(eq(10))
+            .times(1)
+            .returning(|_| Ok(Some(mock_warehouse_with_stats(10, "Gudang Utama", "Jl. Jambu"))));
+
+        mock_repo
+            .expect_warehouse_soft_delete()
+            .with(eq(10))
+            .times(1)
+            .returning(|_| Ok(true));
+
+
+        let service = setup_service(mock_repo);
+        let result = service.delete_warehouse_soft(10, 1).await;
+
+        assert!(result.is_ok(), "Expected successfully soft-deleted warehouse");
+    }
+
+    #[tokio::test]
+    async fn test_delete_warehouse_soft_not_found() {
+        let mut mock_repo = MockWarehouseRepositoryTrait::new();
+
+        mock_repo
+            .expect_find_warehouse_by_id()
+            .with(eq(99))
+            .times(1)
+            .returning(|_| Ok(None));
+
+        let service = setup_service(mock_repo);
+        let result = service.delete_warehouse_soft(99, 1).await;
+
+        assert!(result.is_err(), "Expected to return an Error NotFound");
+        let err = result.unwrap_err();
+        assert!(matches!(err, AppError::NotFound(_)));
+    }
+
+    #[tokio::test]
+    async fn test_delete_warehouse_hard_success() {
+        let mut mock_repo = MockWarehouseRepositoryTrait::new();
+
+        mock_repo
+            .expect_find_warehouse_by_id()
+            .with(eq(10))
+            .times(1)
+            .returning(|_| Ok(Some(mock_warehouse_with_stats(10, "Gudang Lama", "Jl. Lama"))));
+
+        mock_repo
+            .expect_warehouse_hard_delete()
+            .with(eq(10))
+            .times(1)
+            .returning(|_| Ok(true));
+
+        let service = setup_service(mock_repo);
+        let result = service.delete_warehouse_hard(10, 1).await;
+
+        assert!(result.is_ok(), "Expected successfully hard-deleted warehouse");
+    }
+
+    #[tokio::test]
+    async fn test_delete_warehouse_hard_not_found() {
+        let mut mock_repo = MockWarehouseRepositoryTrait::new();
+
+        mock_repo
+            .expect_find_warehouse_by_id()
+            .with(eq(99))
+            .times(1)
+            .returning(|_| Ok(None));
+
+        let service = setup_service(mock_repo);
+        let result = service.delete_warehouse_hard(99, 1).await;
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, AppError::NotFound(_)));
+    }
+
+    #[tokio::test]
+    async fn test_update_warehouse_photo_success() {
+        let mut mock_repo = MockWarehouseRepositoryTrait::new();
+
+        mock_repo
+            .expect_find_warehouse_by_id()
+            .with(eq(10))
+            .times(1)
+            .returning(|_| Ok(Some(mock_warehouse_with_stats(10, "Gudang Foto", "Jl. Foto"))));
+
+        //.withf karena parameter kedua adalah referensi string (&str)
+        mock_repo
+            .expect_update_warehouse_photo()
+            .withf(|id: &i64, photo_url: &str| {
+                *id == 10 && photo_url == "https://bucket.com"
+            })
+            .times(1)
+            .returning(|_, _| Ok(()));
+
+        let service = setup_service(mock_repo);
+        let result = service.update_warehouse_photo(10, "https://bucket.com", 1).await;
+
+        assert!(result.is_ok(), "Expected successfully updated warehouse photo");
+    }
+
+    #[tokio::test]
+    async fn test_update_warehouse_photo_not_found() {
+        let mut mock_repo = MockWarehouseRepositoryTrait::new();
+
+        mock_repo
+            .expect_find_warehouse_by_id()
+            .with(eq(99))
+            .times(1)
+            .returning(|_| Ok(None));
+
+        let service = setup_service(mock_repo);
+        let result = service.update_warehouse_photo(99, "https://bucket.com", 1).await;
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, AppError::NotFound(_)));
     }
 
     #[tokio::test]

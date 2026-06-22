@@ -1,8 +1,8 @@
-use axum::{Json, response::IntoResponse};
+use axum::{Json, response::IntoResponse, http::StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq, Clone)]
 pub struct ListQuery {
     #[serde(default = "default_page")] // page number
     pub page: i64,
@@ -82,6 +82,6 @@ impl<T: Serialize> IntoResponse for PaginatedResponse<T> {
             "data": self.items,
             "meta": self.meta,
         });
-        Json(body).into_response()
+        (StatusCode::OK, Json(body)).into_response()
     }
 }
