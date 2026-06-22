@@ -22,16 +22,15 @@ pub struct UserService<R: UserRepositoryTrait> {
 
 impl<R: UserRepositoryTrait> UserService<R> {
     pub fn new(repo: Arc<R>) -> Self {
-        Self {
-            repo
-        }
+        Self { repo }
     }
 }
 
 #[async_trait]
 impl<R: UserRepositoryTrait> UserServiceTrait for UserService<R>  {
     async fn create_user(&self, req: CreateUserRequest) -> AppResult<UserResponse> {
-        if self.repo.check_email_exists(&req.email).await? {
+        // Exclude user id diisi None karena ini adalah user baru
+        if self.repo.check_email_exists(&req.email, None).await? {
             return Err(AppError::Conflict(format!(
                 "Email '{}' is already registered",
                 req.email
@@ -50,15 +49,9 @@ impl<R: UserRepositoryTrait> UserServiceTrait for UserService<R>  {
             .create_user(&req.name, &req.email, &password_hash, req.phone.as_deref(), &req.role)
             .await?;
 
-        let user_with_role = self
-            .repo
-            .find_user_by_id(user.id)
-            .await?
-            .ok_or_else(|| AppError::Internal(anyhow::anyhow!("User not found after insert")))?;
-
         info!(user_id = user.id, email = %req.email, "New user created");
         
-        Ok(UserResponse::from(user_with_role))
+        Ok(UserResponse::from(user))
     }
 
     async fn list_all_users(&self, query: ListQuery) -> AppResult<PaginatedResponse<UserResponse>> {
@@ -70,7 +63,6 @@ impl<R: UserRepositoryTrait> UserServiceTrait for UserService<R>  {
             .collect();
 
         Ok(PaginatedResponse::new(items, total, query.page, query.per_page))
-
     }
 
     async fn find_user_by_id(&self, user_id: i64) -> AppResult<UserResponse> {
@@ -83,24 +75,31 @@ impl<R: UserRepositoryTrait> UserServiceTrait for UserService<R>  {
     }
 
     async fn update_user(&self, user_id: i64, req: UpdateUserRequest) -> AppResult<UserResponse> {
-        let user = self.repo
+        // 1. Pastikan user ada sebelum di-update
+        self.repo
             .find_user_by_id(user_id)
             .await?
             .ok_or_else(|| AppError::NotFound(format!("User with id {}", user_id)))?;
 
+        // 2. Validasi duplikasi email (abaikan email milik user itu sendiri)
         if let Some(email) = &req.email {
-            if self.repo.check_email_exists(email).await? {
+            if self.repo.check_email_exists(email, Some(user_id)).await? {
                 return Err(AppError::Conflict(format!(
                     "Email '{}' is already registered",
                     email
                 )));
             }
         }
-        self.repo
-            .update_user(user_id, req.name.as_deref(), req.email.as_deref(), req.phone.as_deref())
-            .await?;
 
-        Ok(UserResponse::from(user))
+        let updated_user = self.repo
+            .update_user(user_id, req.name.as_deref(), req.email.as_deref(), req.phone.as_deref())
+            .await?
+            // Jika None, berarti ada masalah konkurensi atau data hilang di DB secara tiba-tiba
+            .ok_or_else(|| AppError::Internal(anyhow::anyhow!("User with id {} disappeared during update", user_id)))?;
+
+        info!(user_id = user_id, "User updated successfully");
+
+        Ok(UserResponse::from(updated_user))
     }
 
     async fn user_soft_delete(&self, user_id: i64) -> AppResult<()> {
@@ -111,11 +110,10 @@ impl<R: UserRepositoryTrait> UserServiceTrait for UserService<R>  {
 
         self.repo.user_soft_delete(user_id).await?;
 
-
         info!(user_id = user_id, "User soft deleted");
-
         Ok(())
     }
+
     async fn user_hard_delete(&self, user_id: i64) -> AppResult<()> {
         self.repo
             .find_user_by_id(user_id)
@@ -124,9 +122,7 @@ impl<R: UserRepositoryTrait> UserServiceTrait for UserService<R>  {
 
         self.repo.user_hard_delete(user_id).await?;
 
-
         info!(user_id = user_id, "User hard deleted");
-
         Ok(())
     }
 
@@ -140,6 +136,7 @@ impl<R: UserRepositoryTrait> UserServiceTrait for UserService<R>  {
             .add_role(req.user_id, &req.role)
             .await?;
 
+        info!(user_id = req.user_id, role = %req.role, "Role added to user");
         Ok(())
     }
 }

@@ -4,7 +4,7 @@ use sqlx::PgPool;
 use crate::{errors::{AppError, AppResult}, models::{User, UserWithRole}, response::ListQuery};
 #[async_trait]
 pub trait UserRepositoryTrait: Send + Sync {
-    async fn check_email_exists(&self, email: &str) -> AppResult<bool>;
+    async fn check_email_exists(&self, email: &str, exclude_id: Option<i64>) -> AppResult<bool>;
     async fn create_user(&self, name: &str, email: &str, password_hash: &str, phone: Option<&str>, role: &str) -> AppResult<User>;
     async fn find_all_users(&self, query: &ListQuery) -> AppResult<(Vec<UserWithRole>, i64)>;
     async fn find_user_by_id(&self, user_id: i64) -> AppResult<Option<UserWithRole>>;
@@ -29,11 +29,17 @@ impl UserRepository {
 
 #[async_trait]
 impl UserRepositoryTrait for UserRepository {
-    async fn check_email_exists(&self, email: &str) -> AppResult<bool>{
+    async fn check_email_exists(&self, email: &str, exclude_id: Option<i64>) -> AppResult<bool>{
         let exists = sqlx::query_scalar!(
-            r#"SELECT EXISTS(SELECT 1 FROM users WHERE email = 
-            $1 AND deleted_at IS NULL)"#,
-            email
+            r#"SELECT EXISTS(
+                SELECT 1 FROM users
+                WHERE email = $1
+                AND deleted_at IS NULL
+                AND ($2::BIGINT IS NULL OR id != $2)
+            )
+            "#,
+            email,
+            exclude_id
         )
         .fetch_one(&self.db)
         .await?

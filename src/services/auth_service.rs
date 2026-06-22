@@ -178,7 +178,7 @@ impl<R: AuthRepositoryTrait> AuthServiceTrait for AuthService<R> {
             .ok_or_else(|| AppError::NotFound(format!("User with id {}", id)))?;
 
         if let Some(email) = &req.email {
-            if self.repo.check_email_exists(email).await? {
+            if self.repo.check_email_exists(email, Some(id)).await? {
                 return Err(AppError::Conflict(format!(
                     "Email '{}' is already registered",
                     email

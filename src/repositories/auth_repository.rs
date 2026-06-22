@@ -13,7 +13,7 @@ use crate::{errors::AppResult, models::{User, UserWithRole}};
 pub trait AuthRepositoryTrait: Send + Sync {
     async fn find_user_by_email(&self, email: &str) -> AppResult<Option<UserWithRole>>;
     async fn find_user_by_id(&self, user_id: i64) -> AppResult<Option<UserWithRole>>;
-    async fn check_email_exists(&self, email: &str) -> AppResult<bool>;
+    async fn check_email_exists(&self, email: &str, exclude_id: Option<i64>) -> AppResult<bool>;
     async fn update_user(&self, id: i64, name: Option<&str>, email: Option<&str>, phone: Option<&str>) -> AppResult<Option<User>>;
     async fn update_user_photo(&self, user_id: i64, photo_url: &str) -> AppResult<()>;
     async fn clear_user_photo(&self, user_id: i64) -> AppResult<()>;
@@ -96,11 +96,17 @@ impl AuthRepositoryTrait for AuthRepository {
         Ok(user)
     }
 
-    async fn check_email_exists(&self, email: &str) -> AppResult<bool>{
+    async fn check_email_exists(&self, email: &str, exclude_id: Option<i64>) -> AppResult<bool>{
         let exists = sqlx::query_scalar!(
-            r#"SELECT EXISTS(SELECT 1 FROM users WHERE email = 
-            $1 AND deleted_at IS NULL)"#,
-            email
+            r#"SELECT EXISTS(
+                SELECT 1 FROM users
+                WHERE email = $1
+                AND deleted_at IS NULL
+                AND ($2::BIGINT IS NULL OR id != $2)
+            )
+            "#,
+            email,
+            exclude_id
         )
         .fetch_one(&self.db)
         .await?

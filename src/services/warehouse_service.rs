@@ -24,9 +24,7 @@ pub struct WarehouseService<R: WarehouseRepositoryTrait> {
 
 impl<R: WarehouseRepositoryTrait> WarehouseService<R> {
     pub fn new(repo: Arc<R>) -> Self {
-        Self {
-            repo
-        }
+        Self { repo }
     }
 }
 
@@ -36,9 +34,9 @@ impl<R: WarehouseRepositoryTrait> WarehouseServiceTrait for WarehouseService<R> 
         let (warehouses, total) = self.repo.find_all_warehouses(&query).await?;
 
         let items: Vec<WarehouseSummary> = warehouses
-            .into_iter() // into_iter() means take ownership from every element in collection (Vec), if it use iter() means borrow (&T), if it use iter_mut() means borrow mutable (&mut T)
-            .map(WarehouseSummary::from) // it same as like .map(|w| WarehouseSummary::from(w))
-            .collect(); // change iterator into Vec
+            .into_iter()
+            .map(WarehouseSummary::from)
+            .collect();
 
         Ok(PaginatedResponse::new(items, total, query.page, query.per_page))
     }
@@ -63,7 +61,7 @@ impl<R: WarehouseRepositoryTrait> WarehouseServiceTrait for WarehouseService<R> 
 
         let warehouse = self
             .repo
-            .create_warehouse(&req.name, &req.address, req.phone.as_deref(), req.photo.as_deref()) // as_deref() convert Option<String> → Option<&str>
+            .create_warehouse(&req.name, &req.address, req.phone.as_deref(), req.photo.as_deref())
             .await?;
 
         info!(
@@ -79,21 +77,14 @@ impl<R: WarehouseRepositoryTrait> WarehouseServiceTrait for WarehouseService<R> 
     async fn update_warehouse(&self, warehouse_id: i64, req: UpdateWarehouseRequest, actor_id: i64) -> AppResult<WarehouseResponse> {
         let phone = req.phone.as_deref().and_then(|v| {
             let v = v.trim();
-            if v.is_empty() {
-                None
-            } else {
-                Some(v)
-            }
+            if v.is_empty() { None } else { Some(v) }
         });
         let photo = req.photo.as_deref().and_then(|v| {
             let v = v.trim();
-            if v.is_empty() {
-                None
-            } else {
-                Some(v)
-            }
+            if v.is_empty() { None } else { Some(v) }
         });
 
+        // Validasi keberadaan awal
         self.repo
             .find_warehouse_by_id(warehouse_id)
             .await?
@@ -118,7 +109,8 @@ impl<R: WarehouseRepositoryTrait> WarehouseServiceTrait for WarehouseService<R> 
                 photo
             )
             .await?
-            .ok_or_else(|| AppError::NotFound(format!("Warehouse with id {}", warehouse_id)))?;
+            // Jika di atas sudah lolos find_by_id, maka None di sini murni karena isu konkurensi data atau kegagalan internal database
+            .ok_or_else(|| AppError::InternalUi("Failed to update warehouse".to_string()))?;
 
         info!(
             warehouse_id = warehouse_id,
@@ -128,6 +120,7 @@ impl<R: WarehouseRepositoryTrait> WarehouseServiceTrait for WarehouseService<R> 
  
         Ok(WarehouseResponse::from(warehouse))
     }
+
     async fn delete_warehouse_soft(&self, warehouse_id: i64, actor_id: i64) -> AppResult<()> {
         self.repo
             .find_warehouse_by_id(warehouse_id)
@@ -136,15 +129,10 @@ impl<R: WarehouseRepositoryTrait> WarehouseServiceTrait for WarehouseService<R> 
 
         self.repo.warehouse_soft_delete(warehouse_id).await?;
 
-        info!(
-            warehouse_id = warehouse_id,
-            actor_id = actor_id,
-            "Warehouse soft-deleted"
-        );
- 
+        info!(warehouse_id, actor_id, "Warehouse soft-deleted");
         Ok(())
-
     }
+
     async fn delete_warehouse_hard(&self, warehouse_id: i64, actor_id: i64) -> AppResult<()> {
         self.repo
             .find_warehouse_by_id(warehouse_id)
@@ -153,15 +141,10 @@ impl<R: WarehouseRepositoryTrait> WarehouseServiceTrait for WarehouseService<R> 
 
         self.repo.warehouse_hard_delete(warehouse_id).await?;
 
-        info!(
-            warehouse_id = warehouse_id,
-            actor_id = actor_id,
-            "Warehouse hard-deleted"
-        );
- 
+        info!(warehouse_id, actor_id, "Warehouse hard-deleted");
         Ok(())
-
     }
+
     async fn update_warehouse_photo(&self, warehouse_id: i64, photo_url: &str, actor_id: i64) -> AppResult<()> {
         self.repo
             .find_warehouse_by_id(warehouse_id)
@@ -170,15 +153,10 @@ impl<R: WarehouseRepositoryTrait> WarehouseServiceTrait for WarehouseService<R> 
         
         self.repo.update_warehouse_photo(warehouse_id, photo_url).await?;
  
-        info!(
-            warehouse_id = warehouse_id,
-            actor_id = actor_id,
-            photo_url = photo_url,
-            "Warehouse photo updated"
-        );
- 
+        info!(warehouse_id, actor_id, photo_url, "Warehouse photo updated");
         Ok(())
     }
+
     async fn delete_warehouse_photo(&self, warehouse_id: i64, actor_id: i64) -> AppResult<()> {
         self.repo
             .find_warehouse_by_id(warehouse_id)
@@ -187,18 +165,13 @@ impl<R: WarehouseRepositoryTrait> WarehouseServiceTrait for WarehouseService<R> 
 
         self.repo.clear_warehouse_photo(warehouse_id).await?;
  
-        info!(
-            warehouse_id = warehouse_id,
-            actor_id = actor_id,
-            "Warehouse photo deleted"
-        );
- 
+        info!(warehouse_id, actor_id, "Warehouse photo deleted");
         Ok(())
     }
 
     async fn assign_warehouse_to_user(&self, user_id: i64, warehouse_id: i64) -> AppResult<()> {
-        if self.repo.check_user_existing(user_id).await? {
-            return Err(AppError::NotFound(format!("User with id {}", user_id)))
+        if !self.repo.check_user_existing(user_id).await? {
+            return Err(AppError::NotFound(format!("User with id {}", user_id)));
         }
 
         self.repo
@@ -207,13 +180,17 @@ impl<R: WarehouseRepositoryTrait> WarehouseServiceTrait for WarehouseService<R> 
             .ok_or_else(|| AppError::NotFound(format!("Warehouse with id {}", warehouse_id)))?;
 
         if self.repo.check_existing_warehouse_in_user(user_id, warehouse_id).await? {
-            return Err(AppError::Conflict(format!("Warehouse with id {} is already assign to user with id {}", warehouse_id, user_id)));
+            return Err(AppError::Conflict(format!(
+                "Warehouse with id {} is already assigned to user with id {}", 
+                warehouse_id, user_id
+            )));
         }
 
         self.repo.assign_warehouse_to_user(user_id, warehouse_id).await?;
 
-        Ok(())
+        info!(user_id, warehouse_id, "Warehouse successfully assigned to user");
 
+        Ok(())
     }
 }
 
