@@ -225,14 +225,27 @@ mod tests {
 use mockall::predicate::*;
 
     use crate::{
-        dtos::{CreateWarehouseRequest, UpdateWarehouseRequest}, errors::AppError, models::WarehouseWithStats, repositories::warehouse_repository::MockWarehouseRepositoryTrait
+        dtos::{CreateWarehouseRequest, UpdateWarehouseRequest}, errors::AppError, models::{Warehouse, WarehouseWithStats}, repositories::warehouse_repository::MockWarehouseRepositoryTrait
     };
 
     fn setup_service(repo: MockWarehouseRepositoryTrait) -> WarehouseService<MockWarehouseRepositoryTrait> {
         WarehouseService::new(Arc::new(repo))
     }
 
-    fn mock_warehouse(id: i64, name: &str, address: &str) -> WarehouseWithStats {
+    fn mock_warehouse(id: i64, name: &str, address: &str) -> Warehouse {
+        Warehouse {
+            id,
+            name: name.to_string(),
+            address: address.to_string(),
+            photo: None,
+            phone: None,
+            deleted_at: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    fn mock_warehouse_with_stats(id: i64, name: &str, address: &str) -> WarehouseWithStats {
         WarehouseWithStats {
             id,
             name: name.to_string(),
@@ -254,7 +267,7 @@ use mockall::predicate::*;
             .expect_find_warehouse_by_id()
             .with(eq(1))
             .times(1)
-            .returning(|_| Ok(Some(mock_warehouse(1, "Gudang Jakarta", "Jl. Merdeka No 1"))));
+            .returning(|_| Ok(Some(mock_warehouse_with_stats(1, "Gudang Jakarta", "Jl. Merdeka No 1"))));
 
         let service = setup_service(mock_repo);
         let result = service.get_warehouse_by_id(1).await;
@@ -279,10 +292,77 @@ use mockall::predicate::*;
         let result = service.get_warehouse_by_id(99).await;
 
         assert!(result.is_err(), "Exptected to return an Error Not Found");
-        
+
         let err = result.unwrap_err();
 
         assert!(matches!(err, AppError::NotFound(_)), "The expected type is NotFound");
         assert_eq!(err.to_string(), "Warehouse with id 99 not found");
     }
+
+    #[tokio::test]
+    async fn test_create_warehouse_success() {
+        let req = CreateWarehouseRequest {
+            name: "Gudang Baru".to_string(),
+            address: "Jl. Baru".to_string(),
+            phone: Some("088556637748".to_string()),
+            photo: None
+        };
+
+        let mut mock_repo = MockWarehouseRepositoryTrait::new();
+        
+        mock_repo
+            .expect_check_name_exists()
+            .with(eq("Gudang Baru".to_string()), eq(None))
+            .times(1)
+            .returning(|_, _| Ok(false));
+
+        mock_repo
+            .expect_create_warehouse()
+            .withf(|name: &str, address: &str, phone: &Option<&str>, photo: &Option<&str>| {
+            name == "Gudang Baru" 
+                && address == "Jl. Baru" 
+                && *phone == Some("088556637748") 
+                && photo.is_none()
+        })
+            .times(1)
+            .returning(|_, _, _, _| Ok(mock_warehouse(1, "Gudang Baru", "Jl. Baru")));
+
+        let service = setup_service(mock_repo);
+        let result = service.create_warehouse(req, 1).await;
+
+        assert!(result.is_ok(), "Expected to return Ok(WarehouseResponse)");
+        let response = result.unwrap();
+        assert_eq!(response.id, 1);
+        assert_eq!(response.name, "Gudang Baru");
+    }
+
+    #[tokio::test]
+    async fn test_create_warehouse_conflict(){
+        let req = CreateWarehouseRequest {
+            name: "Gudang Duplikat".to_string(),
+            address: "Jl. Duplikat".to_string(),
+            phone: None,
+            photo: None,
+        };
+
+        let mut mock_repo = MockWarehouseRepositoryTrait::new();
+        
+        mock_repo
+            .expect_check_name_exists()
+            .with(eq("Gudang Duplikat".to_string()), eq(None))
+            .times(1)
+            .returning(|_, _| Ok(true));
+
+        let service = setup_service(mock_repo);
+        let result = service.create_warehouse(req, 1).await;
+
+        assert!(result.is_err(), "Expected to return an Error Conflict");
+
+        let err = result.unwrap_err();
+        assert!(matches!(err, AppError::Conflict(_)), "The expected type is Conflict");
+        assert_eq!(err.to_string(), "Warehouse with name 'Gudang Duplikat' already exists");
+    }
+
+    
+
 }
