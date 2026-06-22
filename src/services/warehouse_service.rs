@@ -340,6 +340,113 @@ use mockall::predicate::*;
         assert_eq!(err.to_string(), "Warehouse with name 'Gudang Duplikat' already exists");
     }
 
+    #[tokio::test]
+    async fn test_assign_warehouse_success() {
+        let mut mock_repo = MockWarehouseRepositoryTrait::new();
+        mock_repo
+            .expect_check_user_existing()
+            .with(eq(10))
+            .times(1)
+            .returning(|_| Ok(true));
+
+        mock_repo
+            .expect_find_warehouse_by_id()
+            .with(eq(20))
+            .times(1)
+            .returning(|_| Ok(Some(mock_warehouse_with_stats(20, "warehouse", "Jl jambu"))));
+
+        mock_repo
+            .expect_check_existing_warehouse_in_user()
+            .with(eq(10), eq(20))
+            .times(1)
+            .returning(|_, _| Ok(false));
+
+        mock_repo
+            .expect_assign_warehouse_to_user()
+            .with(eq(10), eq(20))
+            .times(1)
+            .returning(|_,_| Ok(()));
+
+        let service = setup_service(mock_repo);
+        let result = service.assign_warehouse_to_user(10, 20).await;
+
+        assert!(result.is_ok(), "Expected to successfull assigned warehouse to user");
+
+    }
     
+    #[tokio::test]
+    async fn test_assign_warehouse_user_not_exists() {
+        let mut mock_repo = MockWarehouseRepositoryTrait::new();
+        mock_repo
+            .expect_check_user_existing()
+            .with(eq(10))
+            .times(1)
+            .returning(|_| Ok(false));
+
+        let service = setup_service(mock_repo);
+        let result = service.assign_warehouse_to_user(10, 20).await;
+
+        assert!(result.is_err(), "Expected to error user not exists");
+        let err = result.unwrap_err();
+        assert!(matches!(err, AppError::NotFound(_)), "The expected type is NotFound");
+        assert_eq!(err.to_string(), "User with id 10 not found");
+
+    }
+
+    #[tokio::test]
+    async fn test_assign_warehouse_warehouse_not_exists() {
+        let mut mock_repo = MockWarehouseRepositoryTrait::new();
+        mock_repo
+            .expect_check_user_existing()
+            .with(eq(10))
+            .times(1)
+            .returning(|_| Ok(true));
+
+        mock_repo
+            .expect_find_warehouse_by_id()
+            .with(eq(20))
+            .times(1)
+            .returning(|_| Ok(None));
+
+        let service = setup_service(mock_repo);
+        let result = service.assign_warehouse_to_user(10, 20).await;
+
+        assert!(result.is_err(), "Expected to error warehouse not exists");
+        let err = result.unwrap_err();
+        assert!(matches!(err, AppError::NotFound(_)), "The expected type is NotFound");
+        assert_eq!(err.to_string(), "Warehouse with id 20 not found");
+
+    }
+
+    #[tokio::test]
+    async fn test_assign_warehouse_warehouse_already_assigned_to_user() {
+        let mut mock_repo = MockWarehouseRepositoryTrait::new();
+        mock_repo
+            .expect_check_user_existing()
+            .with(eq(10))
+            .times(1)
+            .returning(|_| Ok(true));
+
+        mock_repo
+            .expect_find_warehouse_by_id()
+            .with(eq(20))
+            .times(1)
+            .returning(|_| Ok(Some(mock_warehouse_with_stats(20, "warehouse", "Jl jambu"))));
+
+        mock_repo
+            .expect_check_existing_warehouse_in_user()
+            .with(eq(10), eq(20))
+            .times(1)
+            .returning(|_, _| Ok(true));
+
+        let service = setup_service(mock_repo);
+        let result = service.assign_warehouse_to_user(10, 20).await;
+
+        assert!(result.is_err(), "Expected to error warehouse not exists");
+        let err = result.unwrap_err();
+        assert!(matches!(err, AppError::Conflict(_)), "The expected type is Conflict");
+        assert_eq!(err.to_string(), "Warehouse with id 20 is already assigned to user with id 10");
+
+    }
 
 }
