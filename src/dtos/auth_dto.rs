@@ -8,11 +8,14 @@ use crate::validators::common::{validate_indonesian_phone, validate_password_str
 // --- Request DTOs ---
 #[derive(Debug, Deserialize, Validate)]
 pub struct UpdatePasswordRequest {
-    #[validate(custom(function = "validate_password_strength"))]
-    pub password: String,
+    #[validate(length(min = 1, message = "Old Password is required!"))]
+    pub old_password: String,
 
-    #[validate(length(min = 8, message = "Password must at least 8"), must_match(other = "password", message = "Password and Confirm Password doesn't match!"))]
-    pub password_confirm: String
+    #[validate(custom(function = "validate_password_strength"))]
+    pub new_password: String,
+
+    #[validate(length(min = 8, message = "Confirm New Password must at least 8 characters"), must_match(other = "new_password", message = "New Password and Confirm New Password doesn't match!"))]
+    pub confirm_new_password: String
 }
 
 #[derive(Debug, Deserialize, Validate)]

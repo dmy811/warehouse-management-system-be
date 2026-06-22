@@ -4,10 +4,11 @@ use async_trait::async_trait;
 use deadpool_redis::Pool as RedisPool;
 use tracing::{info, warn};
 
-
 use crate::{dtos::{AuthResponse, LoginRequest, UserResponse, auth_dto::UpdatePasswordRequest, user_dto::UpdateUserRequest}, errors::{AppError, AppResult}, infrastructure::{config::Config, redis::{self, keys}}, repositories::AuthRepositoryTrait, utils::{crypto::verify_password, paseto::{create_access_token, generate_refresh_token, hash_refresh_token, verify_refresh_token}}};
 
 const ACCESS_TOKEN_TTL_SECS: i64 = 15 * 60; // 15 minutes
+// Dummy hash konstan untuk mencegah Timing Attack jika email tidak terdaftar
+const DUMMY_HASH: &str = "$2b$12$6UxvE8rXmFp.FhWkY5XvGu9ZzG/B5R5iS3B0qQ7xR8W/yE1mG1b2C"; 
 
 #[async_trait]
 pub trait AuthServiceTrait: Send + Sync {
@@ -29,20 +30,16 @@ pub struct AuthService<R: AuthRepositoryTrait> {
 
 impl<R: AuthRepositoryTrait> AuthService<R> {
     pub fn new(repo: Arc<R>, config: Arc<Config>, redis: Arc<RedisPool>) -> Self {
-        Self {
-            repo,
-            config,
-            redis
-        }
+        Self { repo, config, redis }
     }
 
-    async fn record_failed_attempt(&self, email: &str) -> AppResult<()>{
+    async fn record_failed_attempt(&self, email: &str) -> AppResult<()> {
         let failed_key = keys::failed_login(email);
         let count = redis::incr(&self.redis, &failed_key).await?;
-
-        if count == 1 {
-            redis::expire(&self.redis, &failed_key, self.config.auth.lockout_seconds() * 2).await?; // counter lives 2x lockout period
-        }
+        
+        // Selalu perbarui atau set expire untuk mengantisipasi race condition
+        let ttl = self.config.auth.lockout_seconds() * 2;
+        redis::expire(&self.redis, &failed_key, ttl).await?;
 
         if count >= self.config.auth.failed_login_threshold as i64 {
             let lockout_key = keys::lockout(email);
@@ -52,8 +49,8 @@ impl<R: AuthRepositoryTrait> AuthService<R> {
                 email = %email,
                 count = count,
                 lockout_minutes = self.config.auth.failed_login_lockout_minutes,
-                "Account locked duo to repeated failed login attempts"
-            )
+                "Account locked due to repeated failed login attempts"
+            );
         }
 
         Ok(())
@@ -62,37 +59,35 @@ impl<R: AuthRepositoryTrait> AuthService<R> {
 
 #[async_trait]
 impl<R: AuthRepositoryTrait> AuthServiceTrait for AuthService<R> {
-    async fn login(&self, req: LoginRequest) -> AppResult<(AuthResponse, String)>{
+    async fn login(&self, req: LoginRequest) -> AppResult<(AuthResponse, String)> {
         let lockout_key = keys::lockout(&req.email);
         if redis::exists(&self.redis, &lockout_key).await? {
             warn!(email = %req.email, "Login attempt on locked account");
-            return Err(AppError::TooManyRequests("Account temporarily locked due to too many failed attempts. Try again later.".to_string()));
+            return Err(AppError::TooManyRequests("Account temporarily locked. Try again later.".to_string()));
         }
 
-        let user = self
-            .repo
-            .find_user_by_email(&req.email)
-            .await?;
-        
+        let user_opt = self.repo.find_user_by_email(&req.email).await?;
         let generic_error = || AppError::InvalidCredentials("Invalid email or password".to_string());
 
-        let user = match user {
-            Some(u) => u,
-            None => return Err(generic_error())
+        // FIX TIMING ATTACK: Ambil hash asli atau gunakan dummy hash jika email tidak ada
+        let password_hash = match &user_opt {
+            Some(u) => u.password.clone(),
+            None => DUMMY_HASH.to_string(),
         };
 
-        let password_hash = user.password.clone();
         let password = req.password.clone();
         let is_valid = tokio::task::spawn_blocking(move || verify_password(&password, &password_hash))
             .await
             .map_err(|e| AppError::Internal(anyhow::anyhow!("Thread join error: {}", e)))??;
 
-        if !is_valid {
+        // Jika password salah ATAU user-nya memang dari awal tidak ada
+        if !is_valid || user_opt.is_none() {
             self.record_failed_attempt(&req.email).await?;
-            warn!(email = %req.email, "Failed login attempt - wrong password");
+            warn!(email = %req.email, "Failed login attempt");
             return Err(generic_error());
         }
 
+        let user = user_opt.unwrap(); // Aman karena sudah divalidasi di atas
         let failed_key = keys::failed_login(&req.email);
         redis::del(&self.redis, &failed_key).await?;
 
@@ -126,22 +121,12 @@ impl<R: AuthRepositoryTrait> AuthServiceTrait for AuthService<R> {
         let refresh_token_hash = hash_refresh_token(&raw_bytes);
         let redis_key = keys::refresh_token(&refresh_token_hash);
 
-        let user_id_str = redis::get(&self.redis, &redis_key)
-            .await?
-            .ok_or(AppError::InvalidToken)?;
-
-        let user_id: i64 = user_id_str
-            .parse()
-            .map_err(|_| AppError::InvalidToken)?;
+        let user_id_str = redis::get(&self.redis, &redis_key).await?.ok_or(AppError::InvalidToken)?;
+        let user_id: i64 = user_id_str.parse().map_err(|_| AppError::InvalidToken)?;
 
         redis::del(&self.redis, &redis_key).await?;
 
-        let user = self
-            .repo
-            .find_user_by_id(user_id)
-            .await?
-            .ok_or_else(|| AppError::NotFound("User".to_string()))?;
-
+        let user = self.repo.find_user_by_id(user_id).await?.ok_or_else(|| AppError::NotFound("User".to_string()))?;
         let roles = user.roles.clone().unwrap_or_default();
 
         let access_token = create_access_token(user.id, &roles, &self.config.auth.paseto_key, ACCESS_TOKEN_TTL_SECS)?;
@@ -152,39 +137,23 @@ impl<R: AuthRepositoryTrait> AuthServiceTrait for AuthService<R> {
         redis::set_ex(&self.redis, &new_redis_key, &user_id.to_string(), self.config.auth.refresh_token_ttl_seconds()).await?;
 
         info!(user_id = user_id, "Token refreshed");
-        Ok((
-            AuthResponse::new(access_token, user),
-            refresh_token.token
-        ))
-
+        Ok((AuthResponse::new(access_token, user), refresh_token.token))
     }
 
-    
-
-    async fn get_profile(&self, user_id: i64) -> AppResult<UserResponse>{
-        let user = self
-            .repo
-            .find_user_by_id(user_id)
-            .await?
-            .ok_or_else(|| AppError::NotFound("User".to_string()))?;
-
+    async fn get_profile(&self, user_id: i64) -> AppResult<UserResponse> {
+        let user = self.repo.find_user_by_id(user_id).await?.ok_or_else(|| AppError::NotFound("User".to_string()))?;
         Ok(UserResponse::from(user))
     }
 
-     async fn update_profile(&self, id: i64, req: UpdateUserRequest) -> AppResult<UserResponse> {
-        self.repo
-            .find_user_by_id(id)
-            .await?
-            .ok_or_else(|| AppError::NotFound(format!("User with id {}", id)))?;
+    async fn update_profile(&self, id: i64, req: UpdateUserRequest) -> AppResult<UserResponse> {
+        self.repo.find_user_by_id(id).await?.ok_or_else(|| AppError::NotFound(format!("User with id {}", id)))?;
 
         if let Some(email) = &req.email {
             if self.repo.check_email_exists(email, Some(id)).await? {
-                return Err(AppError::Conflict(format!(
-                    "Email '{}' is already registered",
-                    email
-                )));
+                return Err(AppError::Conflict(format!("Email '{}' is already registered", email)));
             }
         }
+        
         let user = self.repo
             .update_user(id, req.name.as_deref(), req.email.as_deref(), req.phone.as_deref())
             .await?
@@ -193,12 +162,8 @@ impl<R: AuthRepositoryTrait> AuthServiceTrait for AuthService<R> {
         Ok(UserResponse::from(user))
     }
 
-    async fn update_profile_photo(&self, user_id: i64, photo_url: &str) -> AppResult<()>{
-        self.repo
-            .find_user_by_id(user_id)
-            .await?
-            .ok_or_else(|| AppError::NotFound("User".to_string()))?;
-        
+    async fn update_profile_photo(&self, user_id: i64, photo_url: &str) -> AppResult<()> {
+        self.repo.find_user_by_id(user_id).await?.ok_or_else(|| AppError::NotFound("User".to_string()))?;
         self.repo.update_user_photo(user_id, photo_url).await
     }
 
@@ -212,14 +177,37 @@ impl<R: AuthRepositoryTrait> AuthServiceTrait for AuthService<R> {
     }
 
     async fn update_profile_password(&self, user_id: i64, req: UpdatePasswordRequest) -> AppResult<()> {
-        self.repo
+        let user = self.repo
             .find_user_by_id(user_id)
             .await?
             .ok_or_else(|| AppError::NotFound("User".to_string()))?;
 
+        let old_password = req.old_password.clone();
+        let user_password_hash = user.password.clone();
+
+        let is_old_password_valid = tokio::task::spawn_blocking(move || {
+            verify_password(&old_password, &user_password_hash)
+        })
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Thread join error during password verification: {}", e)))??;
+
+
+        if !is_old_password_valid {
+            return Err(AppError::InvalidCredentials("Invalid old password".to_string()));
+        }
+
+        let new_password = req.new_password.clone();
+        let new_password_hash = tokio::task::spawn_blocking(move || {
+            crate::utils::crypto::hash_password(&new_password)
+        })
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Thread join error during password hashing: {}", e)))??;
+
         self.repo
-            .update_user_password(user_id, &req.password)
+            .update_user_password(user_id, &new_password_hash)
             .await?;
+
+        info!(user_id = user_id, "User password updated successfully");
         Ok(())
     }
 }
