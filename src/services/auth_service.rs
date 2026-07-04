@@ -215,299 +215,360 @@ impl<R: AuthRepositoryTrait> AuthServiceTrait for AuthService<R> {
 // #[cfg(test)]
 // mod tests {
 //     use std::sync::Arc;
+ 
 //     use async_trait::async_trait;
 //     use chrono::Utc;
 //     use mockall::mock;
-
+ 
 //     use crate::{
 //         dtos::{auth_dto::UpdatePasswordRequest, user_dto::UpdateUserRequest},
-//         errors::{AppError, AppResult},
-//         models::users::{User, UserWithRole},
-//         repositories::AuthRepositoryTrait,
-//         services::auth_service::{AuthService, AuthServiceTrait}
-//     };
-
-
-//      mock! {
-//         AuthRepo {}
- 
-//         #[async_trait]
-//         impl AuthRepositoryTrait for AuthRepo {
-//             async fn find_user_by_email(&self, email: &str) -> AppResult<Option<UserWithRole>>;
-//             async fn find_user_by_id(&self, user_id: i64) -> AppResult<Option<UserWithRole>>;
-//             async fn check_email_exists(&self, email: &str) -> AppResult<bool>;
-//             async fn update_user(&self, id: i64, name: Option<&str>, email: Option<&str>, phone: Option<&str>) -> AppResult<Option<User>>;
-//             async fn update_user_photo(&self, user_id: i64, photo_url: &str) -> AppResult<()>;
-//             async fn clear_user_photo(&self, user_id: i64) -> AppResult<()>;
-//             async fn update_user_password(&self, user_id:i64, password: &str) -> AppResult<()>;
-//         }
-//     }
-// }
-
-
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use chrono::Utc;
-//     use mockall::mock;
- 
-//     use crate::{
 //         errors::AppError,
-//         models::{User, UserWithRole},
-//         utils::crypto::hash_password,
+//         models::users::{User, UserWithRoles}, // adjust path/name to your actual model
+//         repositories::AuthRepositoryTrait,
+//         services::auth_service::{AuthService, AuthServiceTrait},
 //     };
  
 //     // ── Mock repository ───────────────────────────────────────────────────────
-//     // mockall generates a MockAuthRepository that implements AuthRepositoryTrait.
-//     // Each test configures only the methods it needs via .expect_*().
- 
+//     // Mirrors AuthRepositoryTrait exactly — update method signatures here
+//     // if your trait changes.
 //     mock! {
 //         AuthRepo {}
  
 //         #[async_trait]
 //         impl AuthRepositoryTrait for AuthRepo {
-//             async fn find_by_email(&self, email: &str) -> AppResult<Option<UserWithRole>>;
-//             async fn find_by_id(&self, id: i32) -> AppResult<Option<UserWithRole>>;
-//             async fn email_exists(&self, email: &str) -> AppResult<bool>;
-//             async fn create(
+//             async fn find_user_by_email(&self, email: &str) -> AppResult<Option<UserWithRoles>>;
+//             async fn find_user_by_id(&self, id: i64) -> AppResult<Option<UserWithRoles>>;
+//             async fn check_email_exists(&self, email: &str) -> AppResult<bool>;
+//             async fn update_user(
 //                 &self,
-//                 name: &str,
-//                 email: &str,
-//                 password_hash: &str,
+//                 id: i64,
+//                 name: Option<&str>,
+//                 email: Option<&str>,
 //                 phone: Option<&str>,
-//             ) -> AppResult<User>;
-//             async fn update_photo(&self, user_id: i32, photo_url: &str) -> AppResult<()>;
-//             async fn clear_photo(&self, user_id: i32) -> AppResult<()>;
+//             ) -> AppResult<()>;
+//             async fn update_user_photo(&self, user_id: i64, photo_url: &str) -> AppResult<()>;
+//             async fn clear_user_photo(&self, user_id: i64) -> AppResult<()>;
+//             async fn update_user_password(&self, user_id: i64, password_hash: &str) -> AppResult<()>;
 //         }
 //     }
  
-//     // ── Test fixtures ─────────────────────────────────────────────────────────
+//     use crate::errors::AppResult;
  
-//     fn test_config() -> Arc<Config> {
-//         Arc::new(Config {
-//             database_url: String::new(),
-//             jwt_secret: "test_secret_key_long_enough_32ch".to_string(),
-//             jwt_expires_in_secs: 3600,
-//             app_env: crate::infrastructure::config::AppEnv::Development,
-//             cloudinary: crate::infrastructure::config::CloudinaryConfig {
-//                 cloud_name: String::new(),
-//                 api_key: String::new(),
-//                 api_secret: String::new(),
-//             },
-//         })
-//     }
+//     // ── Fixtures ──────────────────────────────────────────────────────────────
  
-//     fn fake_user() -> User {
-//         User {
-//             id: 1,
+//     fn fake_user(id: i64, email: &str) -> UserWithRoles {
+//         UserWithRoles {
+//             id,
 //             name: "Test User".to_string(),
-//             email: "test@example.com".to_string(),
-//             password: hash_password("Password123").unwrap(),
+//             email: email.to_string(),
+//             password: "$argon2id$v=19$m=19456,t=2,p=1$fakehash".to_string(),
 //             photo: None,
 //             phone: None,
+//             roles: Some(vec!["STAFF".to_string()]),
 //             deleted_at: None,
 //             created_at: Utc::now(),
 //             updated_at: Utc::now(),
 //         }
 //     }
  
-//     fn fake_user_with_role(role: Option<&str>) -> UserWithRole {
-//         UserWithRole {
-//             id: 1,
-//             name: "Test User".to_string(),
-//             email: "test@example.com".to_string(),
-//             password: hash_password("Password123").unwrap(),
-//             photo: None,
-//             phone: None,
-//             role_name: role.map(String::from),
-//             deleted_at: None,
-//             created_at: Utc::now(),
-//             updated_at: Utc::now(),
-//         }
-//     }
- 
-//     // ── Login tests ───────────────────────────────────────────────────────────
+//     // ── get_profile ───────────────────────────────────────────────────────────
  
 //     #[tokio::test]
-//     async fn test_login_success_returns_token_and_user() {
+//     async fn test_get_profile_returns_user_when_found() {
 //         let mut mock = MockAuthRepo::new();
-//         mock.expect_find_by_email()
-//             .returning(|_| Ok(Some(fake_user_with_role(Some("ADMIN")))));
+//         mock.expect_find_user_by_id()
+//             .withf(|id| *id == 1)
+//             .returning(|_| Ok(Some(fake_user(1, "test@example.com"))));
  
-//         let service = AuthService::new(Arc::new(mock), test_config());
-//         let result = service.login(LoginRequest {
-//             email: "test@example.com".to_string(),
-//             password: "Password123".to_string(),
-//         }).await;
+//         let service = build_service(mock);
+ 
+//         let result = service.get_profile(1).await;
  
 //         assert!(result.is_ok());
-//         let auth = result.unwrap();
-//         assert!(!auth.access_token.is_empty());
-//         assert_eq!(auth.token_type, "Bearer");
-//         assert_eq!(auth.user.email, "test@example.com");
+//         let profile = result.unwrap();
+//         assert_eq!(profile.id, 1);
+//         assert_eq!(profile.email, "test@example.com");
 //     }
  
 //     #[tokio::test]
-//     async fn test_login_nonexistent_email_returns_invalid_credentials() {
+//     async fn test_get_profile_returns_not_found_when_missing() {
 //         let mut mock = MockAuthRepo::new();
-//         // User not found — returns None
-//         mock.expect_find_by_email().returning(|_| Ok(None));
+//         mock.expect_find_user_by_id()
+//             .returning(|_| Ok(None));
  
-//         let service = AuthService::new(Arc::new(mock), test_config());
-//         let result = service.login(LoginRequest {
-//             email: "ghost@example.com".to_string(),
-//             password: "Password123".to_string(),
-//         }).await;
+//         let service = build_service(mock);
  
-//         // Must NOT distinguish "user not found" from "wrong password"
-//         // to prevent user enumeration attacks
-//         assert!(matches!(result, Err(AppError::InvalidCredentials)));
+//         let result = service.get_profile(999).await;
+ 
+//         assert!(matches!(result, Err(AppError::NotFound(_))));
 //     }
  
 //     #[tokio::test]
-//     async fn test_login_wrong_password_returns_invalid_credentials() {
+//     async fn test_get_profile_response_never_contains_password() {
 //         let mut mock = MockAuthRepo::new();
-//         mock.expect_find_by_email()
-//             .returning(|_| Ok(Some(fake_user_with_role(None))));
+//         mock.expect_find_user_by_id()
+//             .returning(|_| Ok(Some(fake_user(1, "test@example.com"))));
  
-//         let service = AuthService::new(Arc::new(mock), test_config());
-//         let result = service.login(LoginRequest {
-//             email: "test@example.com".to_string(),
-//             password: "WrongPassword".to_string(),
-//         }).await;
+//         let service = build_service(mock);
  
-//         assert!(matches!(result, Err(AppError::InvalidCredentials)));
+//         let profile = service.get_profile(1).await.unwrap();
+ 
+//         // UserResponse should not have a password field at all — this is
+//         // a compile-time guarantee via the type system, but we assert
+//         // here as documentation of that guarantee.
+//         let serialized = serde_json::to_string(&profile).unwrap();
+//         assert!(!serialized.contains("password"));
+//         assert!(!serialized.contains("argon2"));
 //     }
  
-//     #[tokio::test]
-//     async fn test_login_error_message_is_identical_for_wrong_email_and_wrong_password() {
-//         // Security: both failure modes must return exactly the same error
-//         // so an attacker cannot tell which one failed
-//         let mut mock_no_user = MockAuthRepo::new();
-//         mock_no_user.expect_find_by_email().returning(|_| Ok(None));
- 
-//         let mut mock_wrong_pw = MockAuthRepo::new();
-//         mock_wrong_pw.expect_find_by_email()
-//             .returning(|_| Ok(Some(fake_user_with_role(None))));
- 
-//         let service_no_user = AuthService::new(Arc::new(mock_no_user), test_config());
-//         let service_wrong_pw = AuthService::new(Arc::new(mock_wrong_pw), test_config());
- 
-//         let req = LoginRequest {
-//             email: "test@example.com".to_string(),
-//             password: "Wrong".to_string(),
-//         };
- 
-//         let err1 = service_no_user.login(req.clone()).await.unwrap_err();
-//         let err2 = service_wrong_pw.login(LoginRequest {
-//             email: "test@example.com".to_string(),
-//             password: "Wrong".to_string(),
-//         }).await.unwrap_err();
- 
-//         // Both errors must be the same variant
-//         assert!(matches!(err1, AppError::InvalidCredentials));
-//         assert!(matches!(err2, AppError::InvalidCredentials));
-//         // Both errors must have the same message
-//         assert_eq!(err1.to_string(), err2.to_string());
-//     }
- 
-//     // ── Register tests ────────────────────────────────────────────────────────
+//     // ── update_profile ────────────────────────────────────────────────────────
  
 //     #[tokio::test]
-//     async fn test_register_success_returns_token_and_user() {
+//     async fn test_update_profile_success() {
 //         let mut mock = MockAuthRepo::new();
-//         mock.expect_email_exists().returning(|_| Ok(false));
-//         mock.expect_create().returning(|_, _, _, _| Ok(fake_user()));
-//         mock.expect_find_by_id()
-//             .returning(|_| Ok(Some(fake_user_with_role(None))));
+//         mock.expect_find_user_by_id()
+//             .returning(|_| Ok(Some(fake_user(1, "old@example.com"))));
+//         mock.expect_check_email_exists()
+//             .returning(|_| Ok(false));
+//         mock.expect_update_user()
+//             .returning(|_, _, _, _| Ok(()));
  
-//         let service = AuthService::new(Arc::new(mock), test_config());
-//         let result = service.register(RegisterRequest {
-//             name: "Test User".to_string(),
-//             email: "new@example.com".to_string(),
-//             password: "Password123".to_string(),
-//             phone: None,
-//         }).await;
+//         let service = build_service(mock);
+ 
+//         let result = service
+//             .update_profile(
+//                 1,
+//                 UpdateUserRequest {
+//                     name: Some("New Name".to_string()),
+//                     email: Some("new@example.com".to_string()),
+//                     phone: None,
+//                 },
+//             )
+//             .await;
  
 //         assert!(result.is_ok());
-//         let auth = result.unwrap();
-//         assert!(!auth.access_token.is_empty());
 //     }
  
 //     #[tokio::test]
-//     async fn test_register_duplicate_email_returns_conflict() {
+//     async fn test_update_profile_nonexistent_user_returns_not_found() {
 //         let mut mock = MockAuthRepo::new();
-//         // Email already exists
-//         mock.expect_email_exists().returning(|_| Ok(true));
+//         mock.expect_find_user_by_id()
+//             .returning(|_| Ok(None));
  
-//         let service = AuthService::new(Arc::new(mock), test_config());
-//         let result = service.register(RegisterRequest {
-//             name: "Test User".to_string(),
-//             email: "existing@example.com".to_string(),
-//             password: "Password123".to_string(),
-//             phone: None,
-//         }).await;
+//         let service = build_service(mock);
+ 
+//         let result = service
+//             .update_profile(
+//                 999,
+//                 UpdateUserRequest {
+//                     name: Some("New Name".to_string()),
+//                     email: None,
+//                     phone: None,
+//                 },
+//             )
+//             .await;
+ 
+//         assert!(matches!(result, Err(AppError::NotFound(_))));
+//     }
+ 
+//     #[tokio::test]
+//     async fn test_update_profile_duplicate_email_returns_conflict() {
+//         let mut mock = MockAuthRepo::new();
+//         mock.expect_find_user_by_id()
+//             .returning(|_| Ok(Some(fake_user(1, "old@example.com"))));
+//         mock.expect_check_email_exists()
+//             .returning(|_| Ok(true)); // email already taken by someone else
+ 
+//         let service = build_service(mock);
+ 
+//         let result = service
+//             .update_profile(
+//                 1,
+//                 UpdateUserRequest {
+//                     name: None,
+//                     email: Some("taken@example.com".to_string()),
+//                     phone: None,
+//                 },
+//             )
+//             .await;
  
 //         assert!(matches!(result, Err(AppError::Conflict(_))));
 //     }
  
 //     #[tokio::test]
-//     async fn test_register_password_is_stored_as_hash_not_plaintext() {
+//     async fn test_update_profile_same_email_does_not_trigger_conflict_check() {
+//         // Edge case: if user submits their OWN current email unchanged,
+//         // check_email_exists would find it (since it belongs to them) and
+//         // incorrectly reject the update. This test documents the current
+//         // behavior — see note below the test for the recommended fix.
 //         let mut mock = MockAuthRepo::new();
-//         mock.expect_email_exists().returning(|_| Ok(false));
+//         mock.expect_find_user_by_id()
+//             .returning(|_| Ok(Some(fake_user(1, "same@example.com"))));
+//         mock.expect_check_email_exists()
+//             .returning(|_| Ok(true)); // exists because it's THEIR OWN row
+//         // update_user is intentionally NOT mocked to expect a call here —
+//         // if the current implementation calls it, mockall will panic on
+//         // an unexpected call, surfacing the bug.
  
-//         // Capture the password_hash argument passed to create()
-//         mock.expect_create()
-//             .withf(|_, _, password_hash, _| {
-//                 // Must start with argon2 prefix, NOT be plaintext
-//                 password_hash.starts_with("$argon2") && *password_hash != "Password123"
-//             })
-//             .returning(|_, _, _, _| Ok(fake_user()));
+//         let service = build_service(mock);
  
-//         mock.expect_find_by_id()
-//             .returning(|_| Ok(Some(fake_user_with_role(None))));
+//         let result = service
+//             .update_profile(
+//                 1,
+//                 UpdateUserRequest {
+//                     name: None,
+//                     email: Some("same@example.com".to_string()),
+//                     phone: None,
+//                 },
+//             )
+//             .await;
  
-//         let service = AuthService::new(Arc::new(mock), test_config());
-//         let result = service.register(RegisterRequest {
-//             name: "Test User".to_string(),
-//             email: "new@example.com".to_string(),
-//             password: "Password123".to_string(),
-//             phone: None,
-//         }).await;
- 
-//         // If withf() assertion failed, create() would not have been called
-//         // and this would return an error from mockall
-//         assert!(result.is_ok(), "Password was not hashed correctly: {:?}", result.err());
+//         // Current implementation will incorrectly return Conflict here.
+//         // Recommended fix: exclude the user's own ID in check_email_exists,
+//         // similar to the `exclude_id` pattern used in WarehouseRepository.
+//         assert!(matches!(result, Err(AppError::Conflict(_))));
 //     }
  
-//     // ── Me tests ──────────────────────────────────────────────────────────────
+//     // ── update_profile_photo ──────────────────────────────────────────────────
  
 //     #[tokio::test]
-//     async fn test_me_returns_user_without_password() {
+//     async fn test_update_profile_photo_success() {
 //         let mut mock = MockAuthRepo::new();
-//         mock.expect_find_by_id()
-//             .with(mockall::predicate::eq(1))
-//             .returning(|_| Ok(Some(fake_user_with_role(Some("STAFF")))));
+//         mock.expect_find_user_by_id()
+//             .returning(|_| Ok(Some(fake_user(1, "test@example.com"))));
+//         mock.expect_update_user_photo()
+//             .withf(|id, url| *id == 1 && url == "https://cdn.example.com/photo.jpg")
+//             .returning(|_, _| Ok(()));
  
-//         let service = AuthService::new(Arc::new(mock), test_config());
-//         let result = service.me(1).await;
+//         let service = build_service(mock);
+ 
+//         let result = service
+//             .update_profile_photo(1, "https://cdn.example.com/photo.jpg")
+//             .await;
  
 //         assert!(result.is_ok());
-//         let user = result.unwrap();
-//         assert_eq!(user.id, 1);
-//         assert_eq!(user.email, "test@example.com");
-//         assert_eq!(user.role, Some("STAFF".to_string()));
-//         // UserResponse has no password field — confirmed by type system
 //     }
  
 //     #[tokio::test]
-//     async fn test_me_nonexistent_user_returns_not_found() {
+//     async fn test_update_profile_photo_nonexistent_user_returns_not_found() {
 //         let mut mock = MockAuthRepo::new();
-//         mock.expect_find_by_id().returning(|_| Ok(None));
+//         mock.expect_find_user_by_id()
+//             .returning(|_| Ok(None));
  
-//         let service = AuthService::new(Arc::new(mock), test_config());
-//         let result = service.me(999).await;
+//         let service = build_service(mock);
+ 
+//         let result = service
+//             .update_profile_photo(999, "https://cdn.example.com/photo.jpg")
+//             .await;
  
 //         assert!(matches!(result, Err(AppError::NotFound(_))));
+//     }
+ 
+//     // ── delete_profile_photo ──────────────────────────────────────────────────
+ 
+//     #[tokio::test]
+//     async fn test_delete_profile_photo_success() {
+//         let mut mock = MockAuthRepo::new();
+//         mock.expect_find_user_by_id()
+//             .returning(|_| Ok(Some(fake_user(1, "test@example.com"))));
+//         mock.expect_clear_user_photo()
+//             .withf(|id| *id == 1)
+//             .returning(|_| Ok(()));
+ 
+//         let service = build_service(mock);
+ 
+//         let result = service.delete_profile_photo(1).await;
+ 
+//         assert!(result.is_ok());
+//     }
+ 
+//     #[tokio::test]
+//     async fn test_delete_profile_photo_nonexistent_user_returns_not_found() {
+//         let mut mock = MockAuthRepo::new();
+//         mock.expect_find_user_by_id()
+//             .returning(|_| Ok(None));
+ 
+//         let service = build_service(mock);
+ 
+//         let result = service.delete_profile_photo(999).await;
+ 
+//         assert!(matches!(result, Err(AppError::NotFound(_))));
+//     }
+ 
+//     // ── update_profile_password ───────────────────────────────────────────────
+ 
+//     #[tokio::test]
+//     async fn test_update_profile_password_success() {
+//         let mut mock = MockAuthRepo::new();
+//         mock.expect_find_user_by_id()
+//             .returning(|_| Ok(Some(fake_user(1, "test@example.com"))));
+//         mock.expect_update_user_password()
+//             .returning(|_, _| Ok(()));
+ 
+//         let service = build_service(mock);
+ 
+//         let result = service
+//             .update_profile_password(
+//                 1,
+//                 UpdatePasswordRequest {
+//                     password: "NewPassword123".to_string(),
+//                 },
+//             )
+//             .await;
+ 
+//         assert!(result.is_ok());
+//     }
+ 
+//     #[tokio::test]
+//     async fn test_update_profile_password_nonexistent_user_returns_not_found() {
+//         let mut mock = MockAuthRepo::new();
+//         mock.expect_find_user_by_id()
+//             .returning(|_| Ok(None));
+ 
+//         let service = build_service(mock);
+ 
+//         let result = service
+//             .update_profile_password(
+//                 999,
+//                 UpdatePasswordRequest {
+//                     password: "NewPassword123".to_string(),
+//                 },
+//             )
+//             .await;
+ 
+//         assert!(matches!(result, Err(AppError::NotFound(_))));
+//     }
+ 
+//     // NOTE: `update_profile_password` currently stores `req.password` as-is
+//     // via `update_user_password`. If hashing is expected to happen inside
+//     // the service (consistent with how `register`/`login` hash elsewhere),
+//     // double check that `update_user_password` callers hash before calling,
+//     // or that the repository itself hashes — whichever it is, write a test
+//     // asserting the stored value is NOT the plaintext password, mirroring
+//     // `test_register_password_is_stored_as_hash_not_plaintext` from the
+//     // original AuthService tests.
+ 
+//     // ── Test helper ───────────────────────────────────────────────────────────
+ 
+//     fn build_service(mock: MockAuthRepo) -> AuthService<MockAuthRepo> {
+//         let config = Arc::new(crate::infrastructure::config::Config {
+//             // Fill with whatever minimal fields your Config requires.
+//             // Only `auth.*` fields matter for AuthService's non-Redis paths.
+//             ..Default::default()
+//         });
+ 
+//         // login/refresh/logout need a real Redis pool and are NOT covered
+//         // by these unit tests — see module doc comment above. For tests
+//         // that only exercise get_profile/update_profile/*, a Redis pool
+//         // is still required to construct AuthService, but it is never
+//         // actually called by those methods, so a lazily-connected pool
+//         // (never queried) is safe here.
+//         let redis = Arc::new(
+//             deadpool_redis::Config::from_url("redis://127.0.0.1:0") // unused
+//                 .create_pool(Some(deadpool_redis::Runtime::Tokio1))
+//                 .expect("pool creation is lazy, does not connect"),
+//         );
+ 
+//         AuthService::new(Arc::new(mock), config, redis)
 //     }
 // }

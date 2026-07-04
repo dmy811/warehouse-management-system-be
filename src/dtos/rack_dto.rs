@@ -2,15 +2,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
-use crate::models::{Rack, RackWithStats};
+use crate::{models::{Rack, RackWithStats}, validators::common::{validate_rack_code}};
 
-// use serde::Deserialize;
-// use validator::Validate;
-// use regex::Regex;
-// use std::sync::LazyLock; // Gunakan once_cell::sync::Lazy jika menggunakan Rust versi < 1.80
-
-// // Contoh: Regex untuk memastikan kode rak hanya berisi huruf kapital, angka, dan strip (misal: "RACK-A01")
-// static RACK_CODE_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[A-Z0-9\-]+$").unwrap());
 
 // #[derive(Debug, Deserialize, Validate)]
 // pub struct CreateRackRequest {
@@ -43,25 +36,53 @@ use crate::models::{Rack, RackWithStats};
 //     pub description: Option<String>
 // }
 
-// #[derive(Debug, Deserialize, Validate)]
-// pub struct CreateRackRequest {
-//     #[validate(range(min = 1, message = "Warehouse ID not valid"))]
-//     pub warehouse_id: i64,
+#[derive(Debug, Deserialize, Validate)]
+pub struct CreateRackRequest {
+    #[validate(range(min = 1, message = "Warehouse ID not valid"))]
+    pub warehouse_id: i64,
 
-//     #[validate(
-//         length(min = 2, max = 20, message = "Code must be between 2 and 20 characters"),
-//         regex(path = )
-//     )]
-//     pub code: String,
+    #[validate(
+        length(min = 2, max = 50, message = "Code must be between 2 and 50 characters"),
+        custom(function = "validate_rack_code")
+    )]
+    pub code: String,
 
-//     #[validate(length(min = 1, max = 10, message = "Zone must be between 1 and 10 characters"))]
-//     pub zone: Option<String>,
+    #[validate(length(min = 1, max = 20, message = "Zone must be between 1 and 20 characters"))]
+    pub zone: Option<String>,
 
+    #[validate(range(min = 1, max = 100, message = "Level must be between 1 minimal and max 100 characters"))]
+    pub level: Option<i32>,
 
-//     pub level: Option<i32>,
-//     pub capacity: Option<i64>,
-//     pub description: Option<String>
-// }
+    #[validate(range(min = 0, message = "Capacity cannot be negative number"))]
+    pub capacity: Option<i64>,
+
+    #[validate(length(max = 255, message = "description maximum is 255 characters"))]
+    pub description: Option<String>
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct UpdateRackRequest {
+    #[validate(range(min = 1, message = "Warehouse ID not valid"))]
+    pub warehouse_id: Option<i64>,
+
+    #[validate(
+        length(min = 2, max = 50, message = "Code must be between 2 and 50 characters"),
+        custom(function = "validate_rack_code")
+    )]
+    pub code: Option<String>,
+
+    #[validate(length(min = 1, max = 20, message = "Zone must be between 1 and 20 characters"))]
+    pub zone: Option<String>,
+
+    #[validate(range(min = 1, max = 100, message = "Level must be between 1 minimal and max 100 characters"))]
+    pub level: Option<i32>,
+
+    #[validate(range(min = 0, message = "Capacity cannot be negative number"))]
+    pub capacity: Option<i64>,
+
+    #[validate(length(max = 255, message = "description maximum is 255 characters"))]
+    pub description: Option<String>
+}
 
 #[derive(Debug, Serialize)]
 pub struct RackResponse {

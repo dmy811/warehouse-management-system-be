@@ -40,12 +40,22 @@ pub fn validate_sku(sku: &str) -> Result<(), validator::ValidationError> {
     } else {
         let mut err = validator::ValidationError::new("sku_format");
         err.message = Some(
-            "SKU must contain only uppercase letters, digits, and hyphens (e.g. WMS-PROD-001)".into(),
+            "SKU must contain only uppercase letters, digits, and hyphens (e.g. WMS-PROD-001)".into()
         );
         Err(err)
     }
 }
-// pub fn validate_rack_code
+pub fn validate_rack_code(code: &str) -> Result<(), validator::ValidationError> {
+    if RACK_CODE_REGEX.is_match(code) {
+        Ok(())
+    } else {
+        let mut err = validator::ValidationError::new("code_format");
+        err.message = Some(
+            "Rack code format must only contain uppercase letters, numbers, and hyphens. Example: RACK-A01".into()
+        );
+        Err(err)
+    }
+}
 
 
 pub fn validate_role(role: &str) -> Result<(), validator::ValidationError> {
