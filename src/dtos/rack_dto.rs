@@ -63,7 +63,7 @@ pub struct CreateRackRequest {
 #[derive(Debug, Deserialize, Validate)]
 pub struct UpdateRackRequest {
     #[validate(range(min = 1, message = "Warehouse ID not valid"))]
-    pub warehouse_id: Option<i64>,
+    pub warehouse_id: i64,
 
     #[validate(
         length(min = 2, max = 50, message = "Code must be between 2 and 50 characters"),
