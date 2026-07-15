@@ -3,6 +3,7 @@ pub mod warehouse_dto;
 pub mod rack_dto;
 pub mod user_dto;
 pub mod user_warehouse_dto;
+pub mod role_dto;
 
 pub use auth_dto::{AuthResponse, LoginRequest};
 pub use user_dto::{UserResponse};

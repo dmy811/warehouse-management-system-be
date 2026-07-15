@@ -45,7 +45,7 @@ impl <R: RackRepositoryTrait, W: WarehouseRepositoryTrait> RackServiceTrait for 
     async fn get_rack_by_id(&self, id: i64, warehouse_id: i64) -> AppResult<RackSummary> {
         let rack = self
             .repo
-            .find_by_id(id, warehouse_id)
+            .find_rack_by_id(id, warehouse_id)
             .await?
             .ok_or_else(|| AppError::NotFound(format!("Rack with id {}", id)))?;
 

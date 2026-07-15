@@ -9,7 +9,7 @@ use crate::{dtos::{UserResponse, user_dto::{AddRoleRequest, CreateUserRequest, U
 pub trait UserServiceTrait: Send + Sync {
     async fn create_user(&self, req: CreateUserRequest) -> AppResult<UserResponse>;
     async fn list_all_users(&self, query: ListQuery) -> AppResult<PaginatedResponse<UserResponse>>;
-    async fn find_user_by_id(&self, user_id: i64) -> AppResult<UserResponse>;
+    async fn get_user_by_id(&self, user_id: i64) -> AppResult<UserResponse>;
     async fn update_user(&self, user_id: i64, req: UpdateUserRequest) -> AppResult<UserResponse>;
     async fn user_soft_delete(&self, user_id: i64) -> AppResult<()>;
     async fn user_hard_delete(&self, user_id: i64) -> AppResult<()>;
@@ -64,7 +64,7 @@ impl<R: UserRepositoryTrait> UserServiceTrait for UserService<R>  {
         Ok(PaginatedResponse::new(items, total, query.page, query.per_page))
     }
 
-    async fn find_user_by_id(&self, user_id: i64) -> AppResult<UserResponse> {
+    async fn get_user_by_id(&self, user_id: i64) -> AppResult<UserResponse> {
         let user = self.repo
             .find_user_by_id(user_id)
             .await?

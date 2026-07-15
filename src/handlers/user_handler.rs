@@ -35,7 +35,7 @@ pub async fn find_user_by_id(
 ) -> AppResult<impl IntoResponse> {
     require_roles(permissions::CAN_MANAGE_USERS)(auth_user.clone())?;
 
-    let result = state.services.user.find_user_by_id(id).await?;
+    let result = state.services.user.get_user_by_id(id).await?;
 
     Ok(ApiResponse::ok("User retrieved", result))
 }
