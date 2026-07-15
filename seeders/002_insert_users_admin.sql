@@ -1,4 +1,4 @@
--- insert user role ADMIN
+-- insert user
 INSERT INTO public.users (name, email, password)
 SELECT 'El Admin', 'admin@warehouse.com', '$argon2id$v=19$m=19456,t=2,p=1$F5Zcjg4LavVVybXNwMPzxA$DXxQ6zVtQwkAGSx9CyVre4UyT1CMKL2Ron/O5nhKZTw' -- admin123
 WHERE NOT EXISTS(

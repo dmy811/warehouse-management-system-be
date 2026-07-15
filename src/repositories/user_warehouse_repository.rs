@@ -1,11 +1,11 @@
 use async_trait::async_trait;
 use sqlx::PgPool;
 
-use crate::errors::AppResult;
+use crate::{errors::AppResult, models::user_warehouses::UserWarehouses};
 #[async_trait]
 pub trait UserWarehouseRepositoryTrait: Send + Sync {
-    async fn check_assign(&self, user_id: i64, warehouse_id: i64) -> AppResult<bool>;
-    async fn assign_warehouse_to_user(&self, user_id: i64, warehouse_id: i64) -> AppResult<()>;
+    async fn check_assign_warehouse(&self, user_id: i64, warehouse_id: i64) -> AppResult<bool>;
+    async fn assign_warehouse_to_user(&self, user_id: i64, warehouse_id: i64) -> AppResult<UserWarehouses>;
 }
 
 pub struct UserWarehouseRepository {
@@ -22,7 +22,7 @@ impl UserWarehouseRepository {
 
 #[async_trait]
 impl UserWarehouseRepositoryTrait for UserWarehouseRepository {
-    async fn check_assign(&self, user_id: i64, warehouse_id: i64) -> AppResult<bool> {
+    async fn check_assign_warehouse(&self, user_id: i64, warehouse_id: i64) -> AppResult<bool> {
         let exists = sqlx::query_scalar!(
             r#"
             SELECT EXISTS (
@@ -39,17 +39,19 @@ impl UserWarehouseRepositoryTrait for UserWarehouseRepository {
 
         Ok(exists)
     }
-    async fn assign_warehouse_to_user(&self, user_id: i64, warehouse_id: i64) -> AppResult<()> {
-        sqlx::query!(
+    async fn assign_warehouse_to_user(&self, user_id: i64, warehouse_id: i64) -> AppResult<UserWarehouses> {
+        let user_warehouse = sqlx::query_as!(
+            UserWarehouses,
             r#"
             INSERT INTO user_warehouses (user_id, warehouse_id)
             VALUES ($1, $2)
+            RETURNING id, user_id, warehouse_id, created_at, updated_at
             "#,
             user_id,
             warehouse_id
         )
-        .execute(&self.db)
+        .fetch_one(&self.db)
         .await?;
-        Ok(())
+        Ok(user_warehouse)
     }
 }

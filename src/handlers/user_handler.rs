@@ -80,15 +80,3 @@ pub async fn delete_user(
 
     Ok(ApiResponse::ok(message, Value::Null))
 }
-
-pub async fn add_role(
-    State(state): State<AppState>,
-    Extension(auth_user): Extension<AuthUser>,
-    Json(req): Json<AddRoleRequest>
-) -> AppResult<impl IntoResponse> {
-    require_roles(permissions::CAN_MANAGE_USERS)(auth_user.clone())?;
-
-    state.services.user.add_role(req).await?;
-
-    Ok(ApiResponse::ok("Adding role successful", Value::Null))
-}

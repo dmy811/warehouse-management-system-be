@@ -3,7 +3,7 @@ use validator::Validate;
 
 use crate::dtos::UserResponse;
 use crate::models::UserWithRole;
-use crate::validators::common::{validate_indonesian_phone, validate_password_strength};
+use crate::validators::common::{validate_password_strength};
 
 // --- Request DTOs ---
 #[derive(Debug, Deserialize, Validate)]

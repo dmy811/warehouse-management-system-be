@@ -2,16 +2,27 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 
 use crate::{errors::{AppError, AppResult}, models::{User, UserWithRole}, response::ListQuery};
+
+// -- Send artinya Boleh dipindahkan antar thread
+// -- Sync artinya Boleh diakses dari banyak thread secara bersamaan (via reference)
+// -- Kenapa butuh kedua itu, karena gua pakai Arc<dyn AuthRepositoryTrait> sebagai dependency injection, karena dyn trait tidak otomatis Send dan Sync
+// -- Arc<dyn AuthRepositoryTrait> artinya = 
+// -- bisa berbagai implementasi (dyn)
+// -- bisa dishare ke banyak thread (Arc)
+// -- aman untuk async (Send + Sync)
 #[async_trait]
 pub trait UserRepositoryTrait: Send + Sync {
     async fn check_email_exists(&self, email: &str, exclude_id: Option<i64>) -> AppResult<bool>;
     async fn create_user(&self, name: &str, email: &str, password_hash: &str, phone: Option<&str>, role: &str) -> AppResult<User>;
     async fn find_all_users(&self, query: &ListQuery) -> AppResult<(Vec<UserWithRole>, i64)>;
     async fn find_user_by_id(&self, user_id: i64) -> AppResult<Option<UserWithRole>>;
+    async fn find_user_by_email(&self, email: &str) -> AppResult<Option<UserWithRole>>;
     async fn update_user(&self, user_id: i64, name: Option<&str>, email: Option<&str>, phone: Option<&str>) -> AppResult<Option<User>>;
+    async fn update_user_photo(&self, user_id: i64, photo_url: &str) -> AppResult<()>;
+    async fn clear_user_photo(&self, user_id: i64) -> AppResult<()>;
+    async fn update_user_password(&self, user_id:i64, password: &str) -> AppResult<()>;
     async fn user_soft_delete(&self, user_id: i64) -> AppResult<bool>;
     async fn user_hard_delete(&self, user_id: i64) -> AppResult<bool>;
-    async fn add_role(&self, user_id: i64, role: &str) -> AppResult<bool>;
 }
 
 
@@ -208,6 +219,37 @@ impl UserRepositoryTrait for UserRepository {
         Ok((items, total))
     }
 
+    async fn find_user_by_email(&self, email: &str) -> AppResult<Option<UserWithRole>> {
+        let user = sqlx::query_as!(
+            UserWithRole,
+            r#"
+            SELECT
+                u.id,
+                u.name,
+                u.email,
+                u.password,
+                u.photo,
+                u.phone,
+                u.deleted_at,
+                u.created_at,
+                u.updated_at,
+                ARRAY_AGG(r.name) FILTER (WHERE r.name IS NOT NULL) as "roles!"
+            FROM users u
+            LEFT JOIN user_roles ur ON ur.user_id = u.id
+            LEFT JOIN roles r ON r.id = ur.role_id
+            WHERE u.email = $1
+                AND u.deleted_at IS NULL
+            GROUP BY u.id
+            LIMIT 1
+            "#,
+            email
+        )
+        .fetch_optional(&self.db)
+        .await?;
+
+        Ok(user)
+    }
+
     async fn find_user_by_id(&self, user_id: i64) -> AppResult<Option<UserWithRole>> {
         let user = sqlx::query_as!(
             UserWithRole,
@@ -262,6 +304,50 @@ impl UserRepositoryTrait for UserRepository {
         Ok(user)
     }
 
+    async fn update_user_photo(&self, user_id: i64, photo_url: &str) -> AppResult<()>{
+        sqlx::query!(
+            r#"
+            UPDATE users SET photo = $2
+            WHERE id = $1 AND deleted_at IS NULL
+            "#,
+            user_id,
+            photo_url
+        )
+        .execute(&self.db)
+        .await?;
+
+        Ok(())
+    }
+
+    async fn clear_user_photo(&self, user_id: i64) -> AppResult<()>{
+        sqlx::query!(
+            r#"
+            UPDATE users SET photo = NULL
+            WHERE id = $1 AND deleted_at IS NULL
+            "#,
+            user_id
+        )
+        .execute(&self.db)
+        .await?;
+    
+        Ok(())
+    }
+
+    async fn update_user_password(&self, user_id: i64, password: &str) -> AppResult<()> {
+        sqlx::query!(
+            r#"
+            UPDATE users SET password = $2
+            WHERE id = $1 AND deleted_at IS NULL
+            "#,
+            user_id,
+            password
+        )
+        .execute(&self.db)
+        .await?;
+
+        Ok(())
+    }
+
     async fn user_soft_delete(&self, user_id: i64) -> AppResult<bool> {
         let result = sqlx::query!(
             r#"
@@ -283,34 +369,6 @@ impl UserRepositoryTrait for UserRepository {
             DELETE FROM users WHERE id = $1
             "#,
             user_id
-        )
-        .execute(&self.db)
-        .await?;
-
-        Ok(result.rows_affected() > 0)
-    }
-
-    async fn add_role(&self, user_id: i64, role: &str) -> AppResult<bool> {
-        let role_id: i64 = sqlx::query_scalar!(
-            r#"
-            SELECT id
-            FROM public.roles
-            WHERE name = $1
-            "#,
-            role
-        )
-        .fetch_optional(&self.db)
-        .await?
-        .ok_or(AppError::NotFound(format!("Role name {}", role)))?;
-
-        let result = sqlx::query!(
-            r#"
-            INSERT INTO public.user_roles (user_id, role_id)
-            VALUES ($1, $2)
-            ON CONFLICT (user_id, role_id) DO NOTHING;
-            "#,
-            user_id,
-            role_id
         )
         .execute(&self.db)
         .await?;

@@ -4,11 +4,11 @@ use async_trait::async_trait;
 
 use tracing::info;
 
-use crate::{errors::{AppError, AppResult}, repositories::{WarehouseRepositoryTrait, user_repository::UserRepositoryTrait, user_warehouse_repository::UserWarehouseRepositoryTrait}};
+use crate::{errors::{AppError, AppResult}, models::user_warehouses::UserWarehouses, repositories::{WarehouseRepositoryTrait, user_repository::UserRepositoryTrait, user_warehouse_repository::UserWarehouseRepositoryTrait}};
 
 #[async_trait]
 pub trait UserWarehouseServiceTrait: Send + Sync {
-    async fn assign_warehouse_to_user(&self, user_id: i64, warehouse_id: i64) -> AppResult<()>;
+    async fn assign_warehouse_to_user(&self, user_id: i64, warehouse_id: i64) -> AppResult<UserWarehouses>;
 }
 
 pub struct UserWarehouseService <UW: UserWarehouseRepositoryTrait, U: UserRepositoryTrait, W: WarehouseRepositoryTrait> {
@@ -29,7 +29,7 @@ impl <UW: UserWarehouseRepositoryTrait, U: UserRepositoryTrait, W: WarehouseRepo
 
 #[async_trait]
 impl <UW: UserWarehouseRepositoryTrait, U: UserRepositoryTrait, W: WarehouseRepositoryTrait> UserWarehouseServiceTrait for UserWarehouseService<UW, U, W> {
-    async fn assign_warehouse_to_user(&self, user_id: i64, warehouse_id: i64) -> AppResult<()>{
+    async fn assign_warehouse_to_user(&self, user_id: i64, warehouse_id: i64) -> AppResult<UserWarehouses>{
         self.user_repo
             .find_user_by_id(user_id)
             .await?
@@ -40,18 +40,18 @@ impl <UW: UserWarehouseRepositoryTrait, U: UserRepositoryTrait, W: WarehouseRepo
             .await?
             .ok_or_else(|| AppError::NotFound(format!("Warehouse with id {}", warehouse_id)))?;
 
-        if self.repo.check_assign(user_id, warehouse_id).await? {
+        if self.repo.check_assign_warehouse(user_id, warehouse_id).await? {
             return Err(AppError::Conflict(format!(
                 "Warehouse with id {} is already assigned to user with id {}",
                 warehouse_id, user_id
             )))
         }
 
-        self.repo.assign_warehouse_to_user(user_id, warehouse_id).await?;
+        let user_warehouse = self.repo.assign_warehouse_to_user(user_id, warehouse_id).await?;
 
         info!(user_id, warehouse_id, "Warehouse successfully assigned to user");
 
-        Ok(())
+        Ok(user_warehouse)
     }
 }
 
