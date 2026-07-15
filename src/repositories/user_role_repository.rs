@@ -23,6 +23,23 @@ impl UserRoleRepository {
 
 #[async_trait]
 impl UserRoleRepositoryTrait for UserRoleRepository {
+    async fn check_assign_role(&self, user_id: i64, role_id: i64) -> AppResult<bool> {
+        let exists = sqlx::query_scalar!(
+            r#"
+            SELECT EXISTS (
+                SELECT 1 FROM user_roles
+                WHERE user_id = $1 AND role_id = $2
+            )
+            "#,
+            user_id,
+            role_id
+        )
+        .fetch_one(&self.db)
+        .await?
+        .unwrap_or(false);
+
+        Ok(exists)
+    }
     async fn assign_role_to_user(&self, user_id: i64, role_id: i64) -> AppResult<UserRoles>{
         let user_role = sqlx::query_as!(
             UserRoles,

@@ -14,7 +14,7 @@ pub trait RackRepositoryTrait: Send + Sync {
         warehouse_id: i64,
         params: UpdateRackParams<'_>
     ) -> AppResult<Option<Rack>>;
-    async fn soft_delete(&self, id: i64, warehouse_id: i64) -> AppResult<bool>;
+    async fn soft_delete(&self, id: i64, warehouse_id: i64) -> AppResult<()>;
 }
 
 pub struct RackRepository {
@@ -213,8 +213,8 @@ impl RackRepositoryTrait for RackRepository {
 
         Ok(rack)
     }
-    async fn soft_delete(&self, id: i64, warehouse_id: i64) -> AppResult<bool>{
-        let result = sqlx::query!(
+    async fn soft_delete(&self, id: i64, warehouse_id: i64) -> AppResult<()>{
+        sqlx::query!(
             r#"
             UPDATE racks
             SET deleted_at = NOW(), updated_at = NOW()
@@ -226,6 +226,6 @@ impl RackRepositoryTrait for RackRepository {
         .execute(&self.db)
         .await?;
  
-        Ok(result.rows_affected() > 0)
+        Ok(())
     }
 }

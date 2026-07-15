@@ -461,7 +461,7 @@ use mockall::predicate::*;
             .expect_warehouse_soft_delete()
             .with(eq(10))
             .times(1)
-            .returning(|_| Ok(true));
+            .returning(|_| Ok(()));
 
 
         let service = setup_service(mock_repo);
@@ -502,7 +502,7 @@ use mockall::predicate::*;
             .expect_warehouse_hard_delete()
             .with(eq(10))
             .times(1)
-            .returning(|_| Ok(true));
+            .returning(|_| Ok(()));
 
         let service = setup_service(mock_repo);
         let result = service.delete_warehouse_hard(10, 1).await;

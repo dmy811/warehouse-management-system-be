@@ -4,6 +4,7 @@ pub mod racks;
 pub mod params;
 pub mod user_roles;
 pub mod user_warehouses;
+pub mod roles;
 
 pub use users::{User, Role, UserWithRole};
 pub use racks::{Rack, RackWithStats};

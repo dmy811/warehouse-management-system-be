@@ -3,7 +3,7 @@ use std::sync::Arc;
 use sqlx::PgPool;
 use deadpool_redis::Pool as RedisPool;
 
-use crate::{infrastructure::config::Config, repositories::{AuthRepository, WarehouseRepository, user_repository::UserRepository, user_warehouse_repository::UserWarehouseRepository}, services::{AuthService, AuthServiceTrait, WarehouseService, WarehouseServiceTrait, user_service::{UserService, UserServiceTrait}, user_warehouse_service::{UserWarehouseService, UserWarehouseServiceTrait}}};
+use crate::{infrastructure::config::Config, repositories::{WarehouseRepository, user_repository::UserRepository, user_warehouse_repository::UserWarehouseRepository}, services::{AuthService, AuthServiceTrait, WarehouseService, WarehouseServiceTrait, user_service::{UserService, UserServiceTrait}, user_warehouse_service::{UserWarehouseService, UserWarehouseServiceTrait}}};
 
 #[derive(Clone)]
 pub struct ServiceContainer {
