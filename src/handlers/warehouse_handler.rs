@@ -75,18 +75,3 @@ pub async fn delete_warehouse(
 
     Ok(ApiResponse::ok(message, Value::Null))
 }
-
-pub async fn assign_warehouse_to_user(
-    State(state): State<AppState>,
-    Extension(auth_user): Extension<AuthUser>,
-    Path((id, user_id)): Path<(i64, i64)>
-) -> AppResult<impl IntoResponse> {
-    require_roles(permissions::CAN_MANAGE_MASTER)(auth_user.clone())?;
-
-    state.services.warehouse.assign_warehouse_to_user(user_id, id).await?;
-
-    Ok(ApiResponse::ok("Successfully assigned warehouse", serde_json::json!({
-        "user_id": user_id,
-        "warehouse_id": id
-    })))
-}

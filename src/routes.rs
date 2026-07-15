@@ -3,6 +3,7 @@ pub mod health_routes;
 pub mod warehouse_routes;
 pub mod user_routes;
 pub mod rack_routes;
+pub mod user_warehouse_routes;
 
 pub use auth_routes::{auth_public_routes, auth_protected_routes};
 pub use health_routes::health_routes;

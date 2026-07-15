@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tracing::info;
 
-use crate::{dtos::{CreateWarehouseRequest, UpdateWarehouseRequest, WarehouseResponse, WarehouseSummary}, errors::{AppError, AppResult}, repositories::{WarehouseRepositoryTrait, user_repository::UserRepositoryTrait}, response::{ListQuery, PaginatedResponse}};
+use crate::{dtos::{CreateWarehouseRequest, UpdateWarehouseRequest, WarehouseResponse, WarehouseSummary}, errors::{AppError, AppResult}, repositories::WarehouseRepositoryTrait, response::{PaginatedResponse, ListQuery}};
 
 #[async_trait]
 pub trait WarehouseServiceTrait: Send + Sync {
@@ -15,22 +15,20 @@ pub trait WarehouseServiceTrait: Send + Sync {
     async fn delete_warehouse_hard(&self, warehouse_id: i64, actor_id: i64) -> AppResult<()>;
     async fn update_warehouse_photo(&self, warehouse_id: i64, photo_url: &str, actor_id: i64) -> AppResult<()>;
     async fn delete_warehouse_photo(&self, warehouse_id: i64, actor_id: i64) -> AppResult<()>;
-    async fn assign_warehouse_to_user(&self, user_id: i64, warehouse_id: i64) -> AppResult<()>;
 }
 
-pub struct WarehouseService<W: WarehouseRepositoryTrait, U: UserRepositoryTrait> {
-    repo: Arc<W>,
-    user_repo: Arc<U>
+pub struct WarehouseService<R: WarehouseRepositoryTrait> {
+    repo: Arc<R>
 }
 
-impl<W: WarehouseRepositoryTrait, U: UserRepositoryTrait> WarehouseService<W, U> {
-    pub fn new(repo: Arc<W>, user_repo: Arc<U>) -> Self {
-        Self { repo, user_repo }
+impl<R: WarehouseRepositoryTrait> WarehouseService<R> {
+    pub fn new(repo: Arc<R>) -> Self {
+        Self { repo }
     }
 }
 
 #[async_trait]
-impl<W: WarehouseRepositoryTrait, U: UserRepositoryTrait> WarehouseServiceTrait for WarehouseService<W, U> {
+impl<R: WarehouseRepositoryTrait> WarehouseServiceTrait for WarehouseService<R> {
     async fn get_all_warehouses(&self, query: ListQuery) -> AppResult<PaginatedResponse<WarehouseSummary>> {
         let (warehouses, total) = self.repo.find_all_warehouses(&query).await?;
 
@@ -169,30 +167,6 @@ impl<W: WarehouseRepositoryTrait, U: UserRepositoryTrait> WarehouseServiceTrait 
         info!(warehouse_id, actor_id, "Warehouse photo deleted");
         Ok(())
     }
-
-    async fn assign_warehouse_to_user(&self, user_id: i64, warehouse_id: i64) -> AppResult<()> {
-        if !self.repo.check_user_existing(user_id).await? {
-            return Err(AppError::NotFound(format!("User with id {}", user_id)));
-        }
-
-        self.repo
-            .find_warehouse_by_id(warehouse_id)
-            .await?
-            .ok_or_else(|| AppError::NotFound(format!("Warehouse with id {}", warehouse_id)))?;
-
-        if self.repo.check_existing_warehouse_in_user(user_id, warehouse_id).await? {
-            return Err(AppError::Conflict(format!(
-                "Warehouse with id {} is already assigned to user with id {}", 
-                warehouse_id, user_id
-            )));
-        }
-
-        self.repo.assign_warehouse_to_user(user_id, warehouse_id).await?;
-
-        info!(user_id, warehouse_id, "Warehouse successfully assigned to user");
-
-        Ok(())
-    }
 }
 
 #[cfg(test)]
@@ -203,11 +177,11 @@ mod tests {
 use mockall::predicate::*;
 
     use crate::{
-        dtos::{CreateWarehouseRequest, UpdateWarehouseRequest}, errors::AppError, models::{Warehouse, WarehouseWithStats}, repositories::{user_repository::MockUserRepositoryTrait, warehouse_repository::MockWarehouseRepositoryTrait}
+        dtos::{CreateWarehouseRequest, UpdateWarehouseRequest}, errors::AppError, models::{Warehouse, WarehouseWithStats}, repositories::warehouse_repository::MockWarehouseRepositoryTrait
     };
 
-    fn setup_service(repo: MockWarehouseRepositoryTrait, user_repo: MockUserRepositoryTrait) -> WarehouseService<MockWarehouseRepositoryTrait, MockUserRepositoryTrait> {
-        WarehouseService::new(Arc::new(repo), Arc::new(user_repo))
+    fn setup_service(repo: MockWarehouseRepositoryTrait) -> WarehouseService<MockWarehouseRepositoryTrait> {
+        WarehouseService::new(Arc::new(repo))
     }
 
     fn mock_warehouse(id: i64, name: &str, address: &str) -> Warehouse {
@@ -248,7 +222,6 @@ use mockall::predicate::*;
             sort_order: "asc".to_string()
         };
         let mut mock_repo = MockWarehouseRepositoryTrait::new();
-        let mut mock_user_repo = MockUserRepositoryTrait::new();
         mock_repo
             .expect_find_all_warehouses()
             // .withf(|q: &ListQuery| {
@@ -262,7 +235,7 @@ use mockall::predicate::*;
             .times(1)
             .returning(|_| Ok((vec![], 20)));
 
-        let service = setup_service(mock_repo, mock_user_repo);
+        let service = setup_service(mock_repo);
         let result = service.get_all_warehouses(query).await;
 
         assert!(result.is_ok(), "Expected return all warehouses data")
@@ -271,14 +244,13 @@ use mockall::predicate::*;
     #[tokio::test]
     async fn test_get_warehouse_by_id_success(){
         let mut mock_repo = MockWarehouseRepositoryTrait::new();
-        let mut mock_user_repo = MockUserRepositoryTrait::new();
         mock_repo
             .expect_find_warehouse_by_id()
             .with(eq(1))
             .times(1)
             .returning(|_| Ok(Some(mock_warehouse_with_stats(1, "Gudang Jakarta", "Jl. Merdeka No 1"))));
 
-        let service = setup_service(mock_repo, mock_user_repo);
+        let service = setup_service(mock_repo);
         let result = service.get_warehouse_by_id(1).await;
 
         
@@ -292,13 +264,12 @@ use mockall::predicate::*;
     #[tokio::test]
     async fn test_get_warehouse_by_id_not_found(){
         let mut mock_repo = MockWarehouseRepositoryTrait::new();
-        let mut mock_user_repo = MockUserRepositoryTrait::new();
         mock_repo.expect_find_warehouse_by_id()
         .with(eq(99))
         .times(1)
         .returning(|_| Ok(None));
 
-        let service = setup_service(mock_repo, mock_user_repo);
+        let service = setup_service(mock_repo);
         let result = service.get_warehouse_by_id(99).await;
 
         assert!(result.is_err(), "Exptected to return an Error Not Found");
@@ -319,7 +290,7 @@ use mockall::predicate::*;
         };
 
         let mut mock_repo = MockWarehouseRepositoryTrait::new();
-        let mut mock_user_repo = MockUserRepositoryTrait::new();
+        
         mock_repo
             .expect_check_name_exists()
             .with(eq("Gudang Baru".to_string()), eq(None))
@@ -337,7 +308,7 @@ use mockall::predicate::*;
             .times(1)
             .returning(|_, _, _, _| Ok(mock_warehouse(1, "Gudang Baru", "Jl. Baru")));
 
-        let service = setup_service(mock_repo, mock_user_repo);
+        let service = setup_service(mock_repo);
         let result = service.create_warehouse(req, 1).await;
 
         assert!(result.is_ok(), "Expected to return Ok(WarehouseResponse)");
@@ -356,14 +327,14 @@ use mockall::predicate::*;
         };
 
         let mut mock_repo = MockWarehouseRepositoryTrait::new();
-        let mut mock_user_repo = MockUserRepositoryTrait::new();
+        
         mock_repo
             .expect_check_name_exists()
             .with(eq("Gudang Duplikat".to_string()), eq(None))
             .times(1)
             .returning(|_, _| Ok(true));
 
-        let service = setup_service(mock_repo, mock_user_repo);
+        let service = setup_service(mock_repo);
         let result = service.create_warehouse(req, 1).await;
 
         assert!(result.is_err(), "Expected to return an Error Conflict");
@@ -383,7 +354,7 @@ use mockall::predicate::*;
         };
 
         let mut mock_repo = MockWarehouseRepositoryTrait::new();
-        let mut mock_user_repo = MockUserRepositoryTrait::new();
+
         mock_repo
             .expect_find_warehouse_by_id()
             .with(eq(10))
@@ -408,7 +379,7 @@ use mockall::predicate::*;
             .times(1)
             .returning(|id, _, _, _, _| Ok(Some(mock_warehouse(id, "Gudang Sukses", "Jl. Baru No 5"))));
 
-        let service = setup_service(mock_repo, mock_user_repo);
+        let service = setup_service(mock_repo);
         let result = service.update_warehouse(10, req, 1).await;
 
         assert!(result.is_ok(), "Expected to return Ok(WarehouseResponse)");
@@ -427,14 +398,13 @@ use mockall::predicate::*;
         };
 
         let mut mock_repo = MockWarehouseRepositoryTrait::new();
-        let mut mock_user_repo = MockUserRepositoryTrait::new();
         mock_repo
             .expect_find_warehouse_by_id()
             .with(eq(10))
             .times(1)
             .returning(|_| Ok(None));
 
-        let service = setup_service(mock_repo, mock_user_repo);
+        let service = setup_service(mock_repo);
         let result = service.update_warehouse(10, req, 1).await;
 
         assert!(result.is_err(), "Exptected to return an Error Not Found");
@@ -455,7 +425,7 @@ use mockall::predicate::*;
         };
 
         let mut mock_repo = MockWarehouseRepositoryTrait::new();
-        let mut mock_user_repo = MockUserRepositoryTrait::new();
+
         mock_repo
             .expect_find_warehouse_by_id()
             .with(eq(10))
@@ -468,7 +438,7 @@ use mockall::predicate::*;
             .times(1)
             .returning(|_, _| Ok(true)); // Mengembalikan TRUE untuk memicu eror Conflict
 
-        let service = setup_service(mock_repo, mock_user_repo);
+        let service = setup_service(mock_repo);
         let result = service.update_warehouse(10, req, 1).await;
 
         assert!(result.is_err(), "Expected to return an Error Conflict");
@@ -480,7 +450,7 @@ use mockall::predicate::*;
         #[tokio::test]
     async fn test_delete_warehouse_soft_success() {
         let mut mock_repo = MockWarehouseRepositoryTrait::new();
-        let mut mock_user_repo = MockUserRepositoryTrait::new();
+
         mock_repo
             .expect_find_warehouse_by_id()
             .with(eq(10))
@@ -494,7 +464,7 @@ use mockall::predicate::*;
             .returning(|_| Ok(true));
 
 
-        let service = setup_service(mock_repo, mock_user_repo);
+        let service = setup_service(mock_repo);
         let result = service.delete_warehouse_soft(10, 1).await;
 
         assert!(result.is_ok(), "Expected successfully soft-deleted warehouse");
@@ -503,14 +473,14 @@ use mockall::predicate::*;
     #[tokio::test]
     async fn test_delete_warehouse_soft_not_found() {
         let mut mock_repo = MockWarehouseRepositoryTrait::new();
-        let mut mock_user_repo = MockUserRepositoryTrait::new();
+
         mock_repo
             .expect_find_warehouse_by_id()
             .with(eq(99))
             .times(1)
             .returning(|_| Ok(None));
 
-        let service = setup_service(mock_repo, mock_user_repo);
+        let service = setup_service(mock_repo);
         let result = service.delete_warehouse_soft(99, 1).await;
 
         assert!(result.is_err(), "Expected to return an Error NotFound");
@@ -521,7 +491,7 @@ use mockall::predicate::*;
     #[tokio::test]
     async fn test_delete_warehouse_hard_success() {
         let mut mock_repo = MockWarehouseRepositoryTrait::new();
-        let mut mock_user_repo = MockUserRepositoryTrait::new();
+
         mock_repo
             .expect_find_warehouse_by_id()
             .with(eq(10))
@@ -534,7 +504,7 @@ use mockall::predicate::*;
             .times(1)
             .returning(|_| Ok(true));
 
-        let service = setup_service(mock_repo, mock_user_repo);
+        let service = setup_service(mock_repo);
         let result = service.delete_warehouse_hard(10, 1).await;
 
         assert!(result.is_ok(), "Expected successfully hard-deleted warehouse");
@@ -543,14 +513,14 @@ use mockall::predicate::*;
     #[tokio::test]
     async fn test_delete_warehouse_hard_not_found() {
         let mut mock_repo = MockWarehouseRepositoryTrait::new();
-        let mut mock_user_repo = MockUserRepositoryTrait::new();
+
         mock_repo
             .expect_find_warehouse_by_id()
             .with(eq(99))
             .times(1)
             .returning(|_| Ok(None));
 
-        let service = setup_service(mock_repo, mock_user_repo);
+        let service = setup_service(mock_repo);
         let result = service.delete_warehouse_hard(99, 1).await;
 
         assert!(result.is_err());
@@ -561,7 +531,7 @@ use mockall::predicate::*;
     #[tokio::test]
     async fn test_update_warehouse_photo_success() {
         let mut mock_repo = MockWarehouseRepositoryTrait::new();
-        let mut mock_user_repo = MockUserRepositoryTrait::new();
+
         mock_repo
             .expect_find_warehouse_by_id()
             .with(eq(10))
@@ -577,7 +547,7 @@ use mockall::predicate::*;
             .times(1)
             .returning(|_, _| Ok(()));
 
-        let service = setup_service(mock_repo, mock_user_repo);
+        let service = setup_service(mock_repo);
         let result = service.update_warehouse_photo(10, "https://bucket.com", 1).await;
 
         assert!(result.is_ok(), "Expected successfully updated warehouse photo");
@@ -586,129 +556,19 @@ use mockall::predicate::*;
     #[tokio::test]
     async fn test_update_warehouse_photo_not_found() {
         let mut mock_repo = MockWarehouseRepositoryTrait::new();
-        let mut mock_user_repo = MockUserRepositoryTrait::new();
+
         mock_repo
             .expect_find_warehouse_by_id()
             .with(eq(99))
             .times(1)
             .returning(|_| Ok(None));
 
-        let service = setup_service(mock_repo, mock_user_repo);
+        let service = setup_service(mock_repo);
         let result = service.update_warehouse_photo(99, "https://bucket.com", 1).await;
 
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(matches!(err, AppError::NotFound(_)));
     }
-
-    // #[tokio::test]
-    // async fn test_assign_warehouse_success() {
-    //     let mut mock_repo = MockWarehouseRepositoryTrait::new();
-        
-    //     mock_repo
-    //         .expect_check_user_existing()
-    //         .with(eq(10))
-    //         .times(1)
-    //         .returning(|_| Ok(true));
-
-    //     mock_repo
-    //         .expect_find_warehouse_by_id()
-    //         .with(eq(20))
-    //         .times(1)
-    //         .returning(|_| Ok(Some(mock_warehouse_with_stats(20, "warehouse", "Jl jambu"))));
-
-    //     mock_repo
-    //         .expect_check_existing_warehouse_in_user()
-    //         .with(eq(10), eq(20))
-    //         .times(1)
-    //         .returning(|_, _| Ok(false));
-
-    //     mock_repo
-    //         .expect_assign_warehouse_to_user()
-    //         .with(eq(10), eq(20))
-    //         .times(1)
-    //         .returning(|_,_| Ok(()));
-
-    //     let service = setup_service(mock_repo);
-    //     let result = service.assign_warehouse_to_user(10, 20).await;
-
-    //     assert!(result.is_ok(), "Expected to successfull assigned warehouse to user");
-
-    // }
-    
-    // #[tokio::test]
-    // async fn test_assign_warehouse_user_not_exists() {
-    //     let mut mock_repo = MockWarehouseRepositoryTrait::new();
-    //     mock_repo
-    //         .expect_check_user_existing()
-    //         .with(eq(10))
-    //         .times(1)
-    //         .returning(|_| Ok(false));
-
-    //     let service = setup_service(mock_repo);
-    //     let result = service.assign_warehouse_to_user(10, 20).await;
-
-    //     assert!(result.is_err(), "Expected to error user not exists");
-    //     let err = result.unwrap_err();
-    //     assert!(matches!(err, AppError::NotFound(_)), "The expected type is NotFound");
-    //     assert_eq!(err.to_string(), "User with id 10 not found");
-
-    // }
-
-    // #[tokio::test]
-    // async fn test_assign_warehouse_warehouse_not_exists() {
-    //     let mut mock_repo = MockWarehouseRepositoryTrait::new();
-    //     mock_repo
-    //         .expect_check_user_existing()
-    //         .with(eq(10))
-    //         .times(1)
-    //         .returning(|_| Ok(true));
-
-    //     mock_repo
-    //         .expect_find_warehouse_by_id()
-    //         .with(eq(20))
-    //         .times(1)
-    //         .returning(|_| Ok(None));
-
-    //     let service = setup_service(mock_repo);
-    //     let result = service.assign_warehouse_to_user(10, 20).await;
-
-    //     assert!(result.is_err(), "Expected to error warehouse not exists");
-    //     let err = result.unwrap_err();
-    //     assert!(matches!(err, AppError::NotFound(_)), "The expected type is NotFound");
-    //     assert_eq!(err.to_string(), "Warehouse with id 20 not found");
-
-    // }
-
-    // #[tokio::test]
-    // async fn test_assign_warehouse_warehouse_already_assigned_to_user() {
-    //     let mut mock_repo = MockWarehouseRepositoryTrait::new();
-    //     mock_repo
-    //         .expect_check_user_existing()
-    //         .with(eq(10))
-    //         .times(1)
-    //         .returning(|_| Ok(true));
-
-    //     mock_repo
-    //         .expect_find_warehouse_by_id()
-    //         .with(eq(20))
-    //         .times(1)
-    //         .returning(|_| Ok(Some(mock_warehouse_with_stats(20, "warehouse", "Jl jambu"))));
-
-    //     mock_repo
-    //         .expect_check_existing_warehouse_in_user()
-    //         .with(eq(10), eq(20))
-    //         .times(1)
-    //         .returning(|_, _| Ok(true));
-
-    //     let service = setup_service(mock_repo);
-    //     let result = service.assign_warehouse_to_user(10, 20).await;
-
-    //     assert!(result.is_err(), "Expected to error warehouse not exists");
-    //     let err = result.unwrap_err();
-    //     assert!(matches!(err, AppError::Conflict(_)), "The expected type is Conflict");
-    //     assert_eq!(err.to_string(), "Warehouse with id 20 is already assigned to user with id 10");
-
-    // }
 
 }

@@ -2,15 +2,13 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 
 use crate::{errors::{AppError, AppResult}, models::{User, UserWithRole}, response::ListQuery};
-
-#[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait UserRepositoryTrait: Send + Sync {
     async fn check_email_exists(&self, email: &str, exclude_id: Option<i64>) -> AppResult<bool>;
-    async fn create_user<'a>(&self, name: &str, email: &str, password_hash: &str, phone: Option<&'a str>, role: &str) -> AppResult<User>;
+    async fn create_user(&self, name: &str, email: &str, password_hash: &str, phone: Option<&str>, role: &str) -> AppResult<User>;
     async fn find_all_users(&self, query: &ListQuery) -> AppResult<(Vec<UserWithRole>, i64)>;
     async fn find_user_by_id(&self, user_id: i64) -> AppResult<Option<UserWithRole>>;
-    async fn update_user<'a>(&self, user_id: i64, name: Option<&'a str>, email: Option<&'a str>, phone: Option<&'a str>) -> AppResult<Option<User>>;
+    async fn update_user(&self, user_id: i64, name: Option<&str>, email: Option<&str>, phone: Option<&str>) -> AppResult<Option<User>>;
     async fn user_soft_delete(&self, user_id: i64) -> AppResult<bool>;
     async fn user_hard_delete(&self, user_id: i64) -> AppResult<bool>;
     async fn add_role(&self, user_id: i64, role: &str) -> AppResult<bool>;
@@ -51,12 +49,12 @@ impl UserRepositoryTrait for UserRepository {
     }
 
 
-    async fn create_user<'a>(
+    async fn create_user(
         &self,
         name: &str,
         email: &str,
         password_hash: &str,
-        phone: Option<&'a str>,
+        phone: Option<&str>,
         role: &str
     ) -> AppResult<User>{
         let mut tx = self.db.begin().await?;
@@ -241,7 +239,7 @@ impl UserRepositoryTrait for UserRepository {
     Ok(user)
     }
 
-    async fn update_user<'a>(&self, user_id: i64, name: Option<&'a str>, email: Option<&'a str>, phone: Option<&'a str>) -> AppResult<Option<User>> {
+    async fn update_user(&self, user_id: i64, name: Option<&str>, email: Option<&str>, phone: Option<&str>) -> AppResult<Option<User>> {
         let user = sqlx::query_as!(
             User,
             r#"

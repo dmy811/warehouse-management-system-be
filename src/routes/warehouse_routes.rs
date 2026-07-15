@@ -11,5 +11,4 @@ pub fn warehouse_routes() -> Router<AppState> {
         .route("/warehouses/{id}", delete(warehouse_handler::delete_warehouse))
         .route("/warehouses/{id}/photo", post(upload_handler::upload_warehouse_photo))
         .route("/warehouses/{id}/photo", delete(upload_handler::delete_warehouse_photo))
-        .route("/warehouses/{id}/users/{user_id}", post(warehouse_handler::assign_warehouse_to_user))
     }

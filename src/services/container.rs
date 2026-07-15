@@ -3,13 +3,14 @@ use std::sync::Arc;
 use sqlx::PgPool;
 use deadpool_redis::Pool as RedisPool;
 
-use crate::{infrastructure::config::Config, repositories::{AuthRepository, WarehouseRepository, user_repository::UserRepository}, services::{AuthService, AuthServiceTrait, WarehouseService, WarehouseServiceTrait, user_service::{UserService, UserServiceTrait}}};
+use crate::{infrastructure::config::Config, repositories::{AuthRepository, WarehouseRepository, user_repository::UserRepository, user_warehouse_repository::UserWarehouseRepository}, services::{AuthService, AuthServiceTrait, WarehouseService, WarehouseServiceTrait, user_service::{UserService, UserServiceTrait}, user_warehouse_service::{UserWarehouseService, UserWarehouseServiceTrait}}};
 
 #[derive(Clone)]
 pub struct ServiceContainer {
     pub auth: Arc<dyn AuthServiceTrait>,
     pub warehouse: Arc<dyn WarehouseServiceTrait>,
-    pub user: Arc<dyn UserServiceTrait>
+    pub user: Arc<dyn UserServiceTrait>,
+    pub user_warehouse: Arc<dyn UserWarehouseServiceTrait>
     // pub product: Arc<dyn ProductServiceTrait>,
     // pub category: Arc<dyn CategoryServiceTrait>,
     // pub supplier: Arc<dyn SupplierServiceTrait>,
@@ -27,13 +28,15 @@ impl ServiceContainer {
         let auth_repo = Arc::new(AuthRepository::new(db.clone()));
         let warehouse_repo = Arc::new(WarehouseRepository::new(db.clone()));
         let user_repo = Arc::new(UserRepository::new(db.clone()));
+        let user_warehouse_repo = Arc::new(UserWarehouseRepository::new(db.clone()));
         // let product_repo = Arc::new(ProductRepository::new(db.clone()));
         // ...
 
         Self {
             auth: Arc::new(AuthService::new(auth_repo, config.clone(), redis_pool.clone())),
-            warehouse: Arc::new(WarehouseService::new(warehouse_repo)),
-            user: Arc::new(UserService::new(user_repo))
+            warehouse: Arc::new(WarehouseService::new(warehouse_repo.clone())),
+            user: Arc::new(UserService::new(user_repo.clone())),
+            user_warehouse: Arc::new(UserWarehouseService::new(user_warehouse_repo, user_repo.clone(), warehouse_repo.clone()))
             // product: Arc::new(ProductService::new(product_repo)),
             // // ...
         }
