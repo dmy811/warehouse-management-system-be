@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use async_trait::async_trait;
 
-use crate::{errors::{AppError, AppResult}, models::Role, repositories::roles_repository::RoleRepositoryTrait};
+use crate::{errors::{AppError, AppResult}, models::Role, repositories::role_repository::RoleRepositoryTrait};
 
 #[async_trait]
 pub trait RoleServiceTrait: Send + Sync {

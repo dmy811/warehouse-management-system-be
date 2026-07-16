@@ -4,7 +4,7 @@ use sqlx::PgPool;
 use deadpool_redis::Pool as RedisPool;
 use tower_http::{compression::CompressionLayer, cors::{Any, CorsLayer, AllowOrigin, AllowMethods, AllowHeaders}, trace::TraceLayer};
 
-use crate::{infrastructure::{config::Config, db::create_pool, redis}, middlewares::{auth_middleware, logging_middleware, request_id_middleware}, routes::{auth_protected_routes, auth_public_routes, health_routes, user_routes::user_routes, user_warehouse_routes::user_warehouse_routes, warehouse_routes}, state::AppState};
+use crate::{infrastructure::{config::Config, db::create_pool, redis}, middlewares::{auth_middleware, logging_middleware, request_id_middleware}, routes::{auth_protected_routes, auth_public_routes, health_routes, role_routes::role_routes, user_routes::user_routes, user_warehouse_routes::user_warehouse_routes, warehouse_routes}, state::AppState};
 use crate::constants::file_upload::MAX_FILE_SIZE;
 
 pub async fn build(config: Config) -> Result<Router> {
@@ -24,6 +24,7 @@ pub async fn build_with_pool(pg_pool: PgPool, redis_pool: RedisPool, config: Con
     let protected = Router::new()
         .merge(auth_protected_routes())
         .merge(user_routes())
+        .merge(role_routes())
         .merge(warehouse_routes())
         .merge(user_warehouse_routes())
         .layer(middleware::from_fn_with_state(

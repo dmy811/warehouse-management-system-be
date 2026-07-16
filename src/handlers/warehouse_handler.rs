@@ -28,7 +28,7 @@ pub async fn create_warehouse(
     Extension(auth_user): Extension<AuthUser>,
     Json(req): Json<CreateWarehouseRequest>,
 ) -> AppResult<impl IntoResponse> {
-    require_roles(permissions::CAN_MANAGE_MASTER)(auth_user.clone())?;
+    require_roles(permissions::CAN_MANAGE_USERS)(auth_user.clone())?;
 
     req.validate()
         .map_err(|e| AppError::Validation(e.to_string()))?;
