@@ -6,3 +6,4 @@ pub mod user_handler;
 pub mod rack_handler;
 pub mod user_warehouse_handler;
 pub mod role_handler;
+pub mod user_role_handler;
