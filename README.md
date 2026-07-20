@@ -21,7 +21,8 @@ There are 4 roles: **ADMIN**, **MANAGER**, **STAFF**, and **VIEWER**.
 | Module              | ADMIN                               | MANAGER                  | STAFF                | VIEWER    |
 | ------------------- | ----------------------------------- | ------------------------ | -------------------- | --------- |
 | User Management     | Full CRUD + assign role & warehouse | Read only                | ❌                   | ❌        |
-| Warehouse           | Full CRUD                           | Read only                | Read only            | Read only |
+| Role                | Full CRUD                           | Read only                | Read only            | Read only |
+| Warehouse           | Full CRUD                           | Read + Update            | Read only            | Read only |
 | Product & Category  | Full CRUD                           | CRU                      | Read only            | Read only |
 | Supplier & Customer | Full CRUD                           | CRU                      | Read only            | Read only |
 | Rack                | Full CRUD                           | CRU                      | Read only            | Read only |

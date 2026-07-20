@@ -17,18 +17,18 @@ pub trait WarehouseServiceTrait: Send + Sync {
     async fn delete_warehouse_photo(&self, warehouse_id: i64, actor_id: i64) -> AppResult<()>;
 }
 
-pub struct WarehouseService<R: WarehouseRepositoryTrait> {
-    repo: Arc<R>
+pub struct WarehouseService<W: WarehouseRepositoryTrait> {
+    repo: Arc<W>
 }
 
-impl<R: WarehouseRepositoryTrait> WarehouseService<R> {
-    pub fn new(repo: Arc<R>) -> Self {
+impl<W: WarehouseRepositoryTrait> WarehouseService<W> {
+    pub fn new(repo: Arc<W>) -> Self {
         Self { repo }
     }
 }
 
 #[async_trait]
-impl<R: WarehouseRepositoryTrait> WarehouseServiceTrait for WarehouseService<R> {
+impl<W: WarehouseRepositoryTrait> WarehouseServiceTrait for WarehouseService<W> {
     async fn get_all_warehouses(&self, query: ListQuery) -> AppResult<PaginatedResponse<WarehouseSummary>> {
         let (warehouses, total) = self.repo.find_all_warehouses(&query).await?;
 

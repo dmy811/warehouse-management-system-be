@@ -22,14 +22,14 @@ pub trait AuthServiceTrait: Send + Sync {
     async fn logout(&self, refresh_token_cookie: &str) -> AppResult<()>;
 }
 
-pub struct AuthService<R: UserRepositoryTrait> {
-    user_repo: Arc<R>,
+pub struct AuthService<U: UserRepositoryTrait> {
+    user_repo: Arc<U>,
     config: Arc<Config>,
     redis: Arc<RedisPool>
 }
 
-impl<R: UserRepositoryTrait> AuthService<R> {
-    pub fn new(user_repo: Arc<R>, config: Arc<Config>, redis: Arc<RedisPool>) -> Self {
+impl<U: UserRepositoryTrait> AuthService<U> {
+    pub fn new(user_repo: Arc<U>, config: Arc<Config>, redis: Arc<RedisPool>) -> Self {
         Self { user_repo, config, redis }
     }
 
@@ -58,7 +58,7 @@ impl<R: UserRepositoryTrait> AuthService<R> {
 }
 
 #[async_trait]
-impl<R: UserRepositoryTrait> AuthServiceTrait for AuthService<R> {
+impl<U: UserRepositoryTrait> AuthServiceTrait for AuthService<U> {
     async fn login(&self, req: LoginRequest) -> AppResult<(AuthResponse, String)> {
         let lockout_key = keys::lockout(&req.email);
         if redis::exists(&self.redis, &lockout_key).await? {

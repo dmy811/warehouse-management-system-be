@@ -15,18 +15,18 @@ pub trait UserServiceTrait: Send + Sync {
     async fn user_hard_delete(&self, user_id: i64) -> AppResult<()>;
 }
 
-pub struct UserService<R: UserRepositoryTrait> {
-    repo: Arc<R>
+pub struct UserService<U: UserRepositoryTrait> {
+    repo: Arc<U>
 }
 
-impl<R: UserRepositoryTrait> UserService<R> {
-    pub fn new(repo: Arc<R>) -> Self {
+impl<U: UserRepositoryTrait> UserService<U> {
+    pub fn new(repo: Arc<U>) -> Self {
         Self { repo }
     }
 }
 
 #[async_trait]
-impl<R: UserRepositoryTrait> UserServiceTrait for UserService<R>  {
+impl<U: UserRepositoryTrait> UserServiceTrait for UserService<U>  {
     async fn create_user(&self, req: CreateUserRequest) -> AppResult<UserResponse> {
         // Exclude user id diisi None karena ini adalah user baru
         if self.repo.check_email_exists(&req.email, None).await? {
